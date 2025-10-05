@@ -10,12 +10,12 @@ import SwiftUI
 struct ContentView: View {
     // Spiral configuration properties
     @State private var startingRadius: CGFloat = 80 // distance from center
-    @State private var growthPerRadian: CGFloat = 20 // distance between curves
-    @State private var numberOfTurns: CGFloat = 3 // number of curves
-    @State private var centerRadius: CGFloat = 80 // center circle radius
+    @State private var growthPerRadian: CGFloat = 10 // distance between curves
+    @State private var numberOfTurns: CGFloat = 5 // number of curves
+    @State private var centerRadius: CGFloat = 40 // center circle radius
     @State private var itemRadius: CGFloat = 20
     @State private var clockwisePositive: Bool = true
-    @State private var itemSpacing: CGFloat = 1.2
+    @State private var itemSpacing: CGFloat = 1
     
     // Animation state
     @State private var rotation: Double = 0
