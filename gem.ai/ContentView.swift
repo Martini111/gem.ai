@@ -16,9 +16,9 @@ struct SpiralItem: Identifiable {
 struct ContentView: View {
     // Spiral configuration properties
     @State private var startingRadius: CGFloat = 80 // distance from center
-    @State private var growthPerRadian: CGFloat = 30
-    @State private var numberOfTurns: CGFloat = 5 // number if curves
-    @State private var centerRadius: CGFloat = 50
+    @State private var growthPerRadian: CGFloat = 20 // distance between curves
+    @State private var numberOfTurns: CGFloat = 5 // number of curves
+    @State private var centerRadius: CGFloat = 80 // center circle radius
     @State private var itemRadius: CGFloat = 20
     @State private var clockwisePositive: Bool = true
     @State private var itemSpacing: CGFloat = 1.2
@@ -38,14 +38,7 @@ struct ContentView: View {
                 Color.white
                     .ignoresSafeArea()
                 
-                // Center circle
-                Circle()
-                    .fill(.red)
-                    .frame(width: centerRadius * 2, height: centerRadius * 2)
-                    .position(center)
-                    .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
-                
-                // Spiral items
+                // Spiral items (drawn first, so they appear behind)
                 ForEach(items) { item in
                     let position = spiralPosition(
                         for: item,
@@ -59,6 +52,13 @@ struct ContentView: View {
                         .position(position)
                         .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
                 }
+                
+                // Center circle (drawn last, so it appears on top)
+                Circle()
+                    .fill(.red)
+                    .frame(width: centerRadius * 2, height: centerRadius * 2)
+                    .position(center)
+                    .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
             }
             .gesture(
                 DragGesture()
