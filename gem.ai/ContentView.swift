@@ -7,17 +7,11 @@
 
 import SwiftUI
 
-struct SpiralItem: Identifiable {
-    let id = UUID()
-    let angle: Double
-    let index: Int
-}
-
 struct ContentView: View {
     // Spiral configuration properties
     @State private var startingRadius: CGFloat = 80 // distance from center
     @State private var growthPerRadian: CGFloat = 20 // distance between curves
-    @State private var numberOfTurns: CGFloat = 5 // number of curves
+    @State private var numberOfTurns: CGFloat = 1 // number of curves
     @State private var centerRadius: CGFloat = 80 // center circle radius
     @State private var itemRadius: CGFloat = 20
     @State private var clockwisePositive: Bool = true
@@ -40,14 +34,17 @@ struct ContentView: View {
                 
                 // Spiral items (drawn first, so they appear behind)
                 ForEach(items) { item in
-                    let position = spiralPosition(
+                    let position = SpiralItemGenerator.spiralPosition(
                         for: item,
                         center: center,
-                        rotation: rotation
+                        rotation: rotation,
+                        startingRadius: startingRadius,
+                        growthPerRadian: growthPerRadian,
+                        clockwisePositive: clockwisePositive
                     )
                     
                     Circle()
-                        .fill(.blue)
+                        .fill(item.color)
                         .frame(width: itemRadius * 2, height: itemRadius * 2)
                         .position(position)
                         .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
@@ -75,37 +72,12 @@ struct ContentView: View {
     }
     
     private func generateSpiralItems() {
-        items.removeAll()
-        
-        let totalAngle = numberOfTurns * 2 * .pi
-        let targetArcDistance: Double = Double(itemSpacing * 50) // Convert spacing to actual distance
-        var currentAngle: Double = 0
-        var itemIndex = 0
-        
-        while currentAngle <= totalAngle {
-            items.append(SpiralItem(angle: currentAngle, index: itemIndex))
-            
-            // Calculate the next angle to maintain equal arc distance
-            let currentRadius = Double(startingRadius + growthPerRadian * CGFloat(currentAngle))
-            let angleIncrement = targetArcDistance / currentRadius
-            
-            currentAngle += angleIncrement
-            itemIndex += 1
-        }
-    }
-    
-    private func spiralPosition(for item: SpiralItem, center: CGPoint, rotation: Double) -> CGPoint {
-        let adjustedAngle = item.angle + rotation
-        let direction: Double = clockwisePositive ? 1 : -1
-        
-        // Archimedean spiral formula: r = startingRadius + growthPerRadian * θ
-        let radius = startingRadius + growthPerRadian * CGFloat(item.angle)
-        
-        // Convert polar coordinates to Cartesian
-        let x = center.x + CGFloat(radius * cos(adjustedAngle * direction))
-        let y = center.y + CGFloat(radius * sin(adjustedAngle * direction))
-        
-        return CGPoint(x: x, y: y)
+        items = SpiralItemGenerator.generateItems(
+            numberOfTurns: numberOfTurns,
+            itemSpacing: itemSpacing,
+            startingRadius: startingRadius,
+            growthPerRadian: growthPerRadian
+        )
     }
 }
 
