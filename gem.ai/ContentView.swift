@@ -11,7 +11,7 @@ struct ContentView: View {
     // Spiral configuration properties
     @State private var startingRadius: CGFloat = 80 // distance from center
     @State private var growthPerRadian: CGFloat = 20 // distance between curves
-    @State private var numberOfTurns: CGFloat = 1 // number of curves
+    @State private var numberOfTurns: CGFloat = 3 // number of curves
     @State private var centerRadius: CGFloat = 80 // center circle radius
     @State private var itemRadius: CGFloat = 20
     @State private var clockwisePositive: Bool = true
@@ -40,17 +40,23 @@ struct ContentView: View {
                         rotation: rotation,
                         startingRadius: startingRadius,
                         growthPerRadian: growthPerRadian,
-                        clockwisePositive: clockwisePositive
+                        clockwisePositive: clockwisePositive,
+                        numberOfTurns: numberOfTurns
                     )
+                    
+                    let maxAngle = numberOfTurns * 2 * .pi
+                    let effectiveProgress = item.progress + (rotation / maxAngle)
+                    let itemColor = (effectiveProgress < 0.0) ? Color.black : item.color
+                    let progressPercentage = Int(effectiveProgress * 100)
                     
                     ZStack {
                         Circle()
-                            .fill(item.color)
+                            .fill(itemColor)
                             .frame(width: itemRadius * 2, height: itemRadius * 2)
                             .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
                         
-                        Text("\(item.index)")
-                            .font(.system(size: 12, weight: .bold))
+                        Text("\(progressPercentage)%")
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
                     }
                     .position(position)

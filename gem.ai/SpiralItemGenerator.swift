@@ -9,14 +9,14 @@ import SwiftUI
 
 struct SpiralItem: Identifiable {
     let id = UUID()
-    let angle: Double
+    var progress: Double // 0.0 to 1.0, representing position along the spiral
     let index: Int
     let bgImage: String
     let color: Color
 }
 
 class SpiralItemGenerator {
-    static let maxItemCount: Int = 5 // Control the maximum number of items
+    static let maxItemCount: Int = 10 // Control the maximum number of items
     
     static func generateItems(
         numberOfTurns: CGFloat,
@@ -39,7 +39,7 @@ class SpiralItemGenerator {
             let bgImages = ["star.fill", "heart.fill", "diamond.fill", "circle.fill", "square.fill", "triangle.fill"]
             
             let item = SpiralItem(
-                angle: currentAngle,
+                progress: currentAngle / maxAngle, // Normalize progress between 0.0 and 1.0
                 index: itemIndex,
                 bgImage: bgImages.randomElement() ?? "circle.fill",
                 color: colors.randomElement() ?? .blue
@@ -59,10 +59,13 @@ class SpiralItemGenerator {
         rotation: Double,
         startingRadius: CGFloat,
         growthPerRadian: CGFloat,
-        clockwisePositive: Bool
+        clockwisePositive: Bool,
+        numberOfTurns: CGFloat
     ) -> CGPoint {
-        let adjustedAngle = item.angle + rotation
-        let radius = startingRadius + growthPerRadian * item.angle
+        let maxAngle = numberOfTurns * 2 * .pi
+        let angle = item.progress * maxAngle
+        let adjustedAngle = angle + rotation
+        let radius = startingRadius + growthPerRadian * angle
         let direction: CGFloat = clockwisePositive ? 1 : -1
         
         let x = center.x + radius * cos(adjustedAngle * direction)
