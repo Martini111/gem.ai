@@ -16,7 +16,7 @@ struct SpiralItem: Identifiable {
 }
 
 class SpiralItemGenerator {
-    static let maxItemCount: Int = 1000 // Control the maximum number of items
+    static let maxItemCount: Int = 5 // Control the maximum number of items
     
     static func generateItems(
         numberOfTurns: CGFloat,

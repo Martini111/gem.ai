@@ -43,11 +43,17 @@ struct ContentView: View {
                         clockwisePositive: clockwisePositive
                     )
                     
-                    Circle()
-                        .fill(item.color)
-                        .frame(width: itemRadius * 2, height: itemRadius * 2)
-                        .position(position)
-                        .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
+                    ZStack {
+                        Circle()
+                            .fill(item.color)
+                            .frame(width: itemRadius * 2, height: itemRadius * 2)
+                            .shadow(color: .black.opacity(0.2), radius: 4, x: 2, y: 2)
+                        
+                        Text("\(item.index)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .position(position)
                 }
                 
                 // Center circle (drawn last, so it appears on top)
