@@ -9,13 +9,17 @@ import SwiftUI
 
 struct ContentView: View {
     // Configuration variables
-    let numberOfItems: Int = 5
+    enum SwipeDirection {
+        case bottomToTop
+        case topToBottom
+    }
+    let swipeDirection: SwipeDirection = .bottomToTop
+    let numberOfItems: Int = 20
     let distanceBetweenCircles: CGFloat = 15
     let numberOfSpiralCurves: Int = 3
     let distanceToCenter: CGFloat = 60
-    let circleSize: CGFloat = 20
+    let circleSize: CGFloat = 30
     let centerCircleSize: CGFloat = 60
-    let animationSpeed: CGFloat = 1.0
     
     @State private var spiralOffset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
@@ -24,7 +28,7 @@ struct ContentView: View {
         GeometryReader { geometry in
             ZStack {
                 Color.clear
-                
+
                 // Spiral carousel - properly centered
                 SpiralCarousel(
                     numberOfItems: numberOfItems,
@@ -37,23 +41,27 @@ struct ContentView: View {
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height - 150)
                 .position(x: geometry.size.width / 2, y: (geometry.size.height - 150) / 2)
-                
-                // Ruler dragger at bottom
-                VStack {
-                    Spacer()
-                    RulerDragger(dragOffset: dragOffset)
-                        .gesture(
-                            DragGesture()
-                                .updating($dragOffset) { value, state, _ in
-                                    // Increase sensitivity for smoother control
-                                    state = value.translation.width * 3.0
-                                }
-                                .onEnded { value in
-                                    spiralOffset += value.translation.width * 3.0
-                                }
-                        )
-                        .padding(.bottom, 50)
-                }
+                // Attach vertical drag gesture to control spiral with swipe up/down (no animation)
+                .gesture(
+                    DragGesture()
+                        .updating($dragOffset) { value, state, _ in
+                            let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
+                            // live movement should follow finger directly (no animation here)
+                            state = verticalSign * value.translation.height * 3.0
+                        }
+                        .onEnded { value in
+                            let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
+                            // prefer predicted end translation for momentum feel
+                            let rawTranslation = value.predictedEndTranslation.height != 0 ? value.predictedEndTranslation.height : value.translation.height
+                            let delta = verticalSign * rawTranslation * 3.0
+                            var target = spiralOffset + delta
+
+                            // Apply immediately without animation
+                            spiralOffset = target
+                        }
+                )
+
+                // Removed ruler dragger - vertical swipe replaces it
             }
         }
         .ignoresSafeArea()
@@ -162,45 +170,6 @@ struct SpiralPath: Shape {
         }
         
         return path
-    }
-}
-
-struct RulerDragger: View {
-    let dragOffset: CGFloat
-    
-    var body: some View {
-        VStack(spacing: 10) {
-            // Ruler marks
-            HStack(spacing: 0) {
-                ForEach(0..<21, id: \.self) { index in
-                    VStack {
-                        Rectangle()
-                            .fill(Color.gray)
-                            .frame(width: 1, height: index % 5 == 0 ? 20 : 10)
-                        
-                        if index % 5 == 0 {
-                            Text("\(index - 10)")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    .frame(width: 20)
-                }
-            }
-            .offset(x: dragOffset * 4)
-            
-            // Dragger handle
-            RoundedRectangle(cornerRadius: 15)
-                .fill(Color.blue)
-                .frame(width: 60, height: 30)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 15)
-                        .stroke(Color.white, lineWidth: 2)
-                )
-                .scaleEffect(1.0)
-                .offset(x: dragOffset)
-        }
-        .padding(.horizontal, 40)
     }
 }
 
