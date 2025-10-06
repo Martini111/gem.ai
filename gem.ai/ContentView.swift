@@ -17,9 +17,9 @@ struct ContentView: View {
     let numberOfItems: Int = 20
     let distanceBetweenCircles: CGFloat = 100
     let numberOfSpiralCurves: Int = 3
-    let distanceToCenter: CGFloat = 150 // radius at which first circle is placed
-    let circleSize: CGFloat = 40
-    let centerCircleSize: CGFloat = 200
+    let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
+    let circleSize: CGFloat = 60
+    let centerCircleSize: CGFloat = 100
     // Maximum velocity (points per second) to cap fast swipes
     let maxVelocityMultiplier: CGFloat = 40
     // velocity decay (per second) for momentum
@@ -163,7 +163,7 @@ struct SpiralCarousel: View {
         let angle = progress * rotationsPerSpiral * 2 * .pi
         
         // Fixed radius calculation for better centering
-        let maxRadius: CGFloat = 150
+        let maxRadius: CGFloat = distanceBetweenCircles * CGFloat(numberOfSpiralCurves)
         let radius = distanceToCenter + (progress * maxRadius)
         
         let x = center.x + radius * cos(angle)
@@ -186,7 +186,7 @@ struct SpiralPath: Shape {
         // Create smooth spiral path with many points
         let totalPoints = 300 // More points for smoother spiral
         let rotationsPerSpiral = CGFloat(numberOfCurves)
-        let maxRadius: CGFloat = 150 // Match the circle positioning
+        let maxRadius: CGFloat = distanceBetweenCircles * CGFloat(numberOfCurves) // Match the circle positioning
         
         for i in 0..<totalPoints {
             let progress = CGFloat(i) / CGFloat(totalPoints - 1)
