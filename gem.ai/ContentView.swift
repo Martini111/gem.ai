@@ -15,8 +15,7 @@ struct ContentView: View {
     }
     let swipeDirection: SwipeDirection = .bottomToTop
     let numberOfItems: Int = 10
-    let distanceBetweenCircles: CGFloat = 100
-    let numberOfSpiralCurves: Int = 1000
+    let distanceBetweenCircles: CGFloat = 80
     let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
     let circleSize: CGFloat = 60
     let centerCircleSize: CGFloat = 150
@@ -24,7 +23,8 @@ struct ContentView: View {
     let maxVelocityMultiplier: CGFloat = 40
     // velocity decay (per second) for momentum
     let velocityDecayPerSecond: CGFloat = 6.0
-    let distanceBetweenItems: CGFloat = 160
+    let distanceBetweenItems: CGFloat = 100
+    let minCurves: Int = 3
 
     @State private var spiralOffset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
@@ -43,12 +43,12 @@ struct ContentView: View {
                     SpiralCarousel(
                         numberOfItems: numberOfItems,
                         distanceBetweenCircles: distanceBetweenCircles,
-                        numberOfSpiralCurves: numberOfSpiralCurves,
                         distanceToCenter: distanceToCenter,
                         circleSize: circleSize,
                         centerCircleSize: centerCircleSize,
                         spiralOffset: spiralOffset + dragOffset,
-                        distanceBetweenItems: distanceBetweenItems
+                        distanceBetweenItems: distanceBetweenItems,
+                        minCurves: minCurves
                     )
                     // Update momentum on each timeline tick
                     .onChange(of: timeline.date) { _, now in
@@ -109,12 +109,12 @@ struct ContentView: View {
 struct SpiralCarousel: View {
     let numberOfItems: Int
     let distanceBetweenCircles: CGFloat
-    let numberOfSpiralCurves: Int
     let distanceToCenter: CGFloat
     let circleSize: CGFloat
     let centerCircleSize: CGFloat
     let spiralOffset: CGFloat
     let distanceBetweenItems: CGFloat
+    let minCurves: Int
     
     var body: some View {
         GeometryReader { geometry in
@@ -123,7 +123,7 @@ struct SpiralCarousel: View {
             ZStack {
                 // Static spiral lines
                 SpiralPath(
-                    numberOfCurves: numberOfSpiralCurves,
+                    minCurves: minCurves,
                     distanceToCenter: distanceToCenter,
                     distanceBetweenCircles: distanceBetweenCircles,
                     numberOfItems: numberOfItems,
@@ -155,8 +155,8 @@ struct SpiralCarousel: View {
     private func spiralPosition(for index: Int, center: CGPoint) -> CGPoint {
         // Parameters for the Archimedean spiral
         let a = distanceToCenter
-        let theta_total = CGFloat(numberOfSpiralCurves) * 2 * .pi
-        let maxRadius = distanceBetweenCircles * CGFloat(numberOfSpiralCurves)
+        let theta_total = CGFloat(minCurves) * 2 * .pi
+        let maxRadius = distanceBetweenCircles * CGFloat(minCurves)
         let b = maxRadius / theta_total
         
         // Calculate the total path length for infinite looping
@@ -183,7 +183,7 @@ struct SpiralCarousel: View {
 }
 
 struct SpiralPath: Shape {
-    let numberOfCurves: Int
+    let minCurves: Int
     let distanceToCenter: CGFloat
     let distanceBetweenCircles: CGFloat
     let numberOfItems: Int
@@ -195,17 +195,22 @@ struct SpiralPath: Shape {
         
         // Parameters for the Archimedean spiral
         let a = distanceToCenter
-        let theta_total = CGFloat(numberOfCurves) * 2 * .pi
-        let maxRadius = distanceBetweenCircles * CGFloat(numberOfCurves)
+        let theta_total = CGFloat(minCurves) * 2 * .pi
+        let maxRadius = distanceBetweenCircles * CGFloat(minCurves)
         let b = maxRadius / theta_total
         let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
+        
+        // Ensure at least 3 curves are displayed
+        let minTheta = CGFloat(minCurves) * 2 * .pi
+        let minS = (b / 2) * minTheta * minTheta + a * minTheta
+        let drawLength = max(totalPathLength, minS)
         
         // Create smooth spiral path with many points
         let totalPoints = 100000 // More points for smoother spiral
         
         for i in 0..<totalPoints {
-            let s = (CGFloat(i) / CGFloat(totalPoints - 1)) * totalPathLength
-            let reversedS = totalPathLength - s
+            let s = (CGFloat(i) / CGFloat(totalPoints - 1)) * drawLength
+            let reversedS = drawLength - s
             
             // Solve for theta: (b/2) * theta^2 + a * theta - reversedS = 0
             let discriminant = a * a + 2 * b * reversedS
