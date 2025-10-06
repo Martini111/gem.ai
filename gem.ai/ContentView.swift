@@ -14,16 +14,17 @@ struct ContentView: View {
         case topToBottom
     }
     let swipeDirection: SwipeDirection = .bottomToTop
-    let numberOfItems: Int = 20
+    let numberOfItems: Int = 10
     let distanceBetweenCircles: CGFloat = 100
-    let numberOfSpiralCurves: Int = 3
+    let numberOfSpiralCurves: Int = 1000
     let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
     let circleSize: CGFloat = 60
-    let centerCircleSize: CGFloat = 100
+    let centerCircleSize: CGFloat = 150
     // Maximum velocity (points per second) to cap fast swipes
     let maxVelocityMultiplier: CGFloat = 40
     // velocity decay (per second) for momentum
     let velocityDecayPerSecond: CGFloat = 6.0
+    let distanceBetweenItems: CGFloat = 160
 
     @State private var spiralOffset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
@@ -46,7 +47,8 @@ struct ContentView: View {
                         distanceToCenter: distanceToCenter,
                         circleSize: circleSize,
                         centerCircleSize: centerCircleSize,
-                        spiralOffset: spiralOffset + dragOffset
+                        spiralOffset: spiralOffset + dragOffset,
+                        distanceBetweenItems: distanceBetweenItems
                     )
                     // Update momentum on each timeline tick
                     .onChange(of: timeline.date) { _, now in
@@ -112,6 +114,7 @@ struct SpiralCarousel: View {
     let circleSize: CGFloat
     let centerCircleSize: CGFloat
     let spiralOffset: CGFloat
+    let distanceBetweenItems: CGFloat
     
     var body: some View {
         GeometryReader { geometry in
@@ -123,15 +126,12 @@ struct SpiralCarousel: View {
                     numberOfCurves: numberOfSpiralCurves,
                     distanceToCenter: distanceToCenter,
                     distanceBetweenCircles: distanceBetweenCircles,
-                    numberOfItems: numberOfItems
+                    numberOfItems: numberOfItems,
+                    distanceBetweenItems: distanceBetweenItems
                 )
                 .stroke(Color.black.opacity(0.2), lineWidth: 2)
                 
-                // Center circle
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: centerCircleSize, height: centerCircleSize)
-                    .position(center)
+                
                 
                 // Moving circles
                 ForEach(0..<numberOfItems, id: \.self) { index in
@@ -141,30 +141,39 @@ struct SpiralCarousel: View {
                         .fill(Color.blue)
                         .frame(width: circleSize, height: circleSize)
                         .position(position)
+                    
+                // Center circle
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: centerCircleSize, height: centerCircleSize)
+                    .position(center)
                 }
             }
         }
     }
     
     private func spiralPosition(for index: Int, center: CGPoint) -> CGPoint {
+        // Parameters for the Archimedean spiral
+        let a = distanceToCenter
+        let theta_total = CGFloat(numberOfSpiralCurves) * 2 * .pi
+        let maxRadius = distanceBetweenCircles * CGFloat(numberOfSpiralCurves)
+        let b = maxRadius / theta_total
+        
         // Calculate the total path length for infinite looping
-        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenCircles
+        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
         
         // Apply offset and ensure infinite looping
-        let adjustedPosition = (CGFloat(index) * distanceBetweenCircles + spiralOffset)
+        let adjustedPosition = (CGFloat(index) * distanceBetweenItems + spiralOffset)
             .truncatingRemainder(dividingBy: totalPathLength)
-        let normalizedPosition = adjustedPosition < 0 ? adjustedPosition + totalPathLength : adjustedPosition
+        let s = adjustedPosition < 0 ? adjustedPosition + totalPathLength : adjustedPosition
         
-        // Calculate progress from 0 to 1
-        let progress = normalizedPosition / totalPathLength
+        // Solve for theta: (b/2) * theta^2 + a * theta - s = 0
+        let discriminant = a * a + 2 * b * s
+        let theta = (-a + sqrt(discriminant)) / b
         
-        // Archimedean spiral: r = a + b*θ
-        let rotationsPerSpiral = CGFloat(numberOfSpiralCurves)
-        let angle = progress * rotationsPerSpiral * 2 * .pi
-        
-        // Fixed radius calculation for better centering
-        let maxRadius: CGFloat = distanceBetweenCircles * CGFloat(numberOfSpiralCurves)
-        let radius = distanceToCenter + (progress * maxRadius)
+        // Calculate angle and radius
+        let angle = theta
+        let radius = distanceToCenter + b * theta
         
         let x = center.x + radius * cos(angle)
         let y = center.y + radius * sin(angle)
@@ -178,22 +187,33 @@ struct SpiralPath: Shape {
     let distanceToCenter: CGFloat
     let distanceBetweenCircles: CGFloat
     let numberOfItems: Int
+    let distanceBetweenItems: CGFloat
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.width / 2, y: rect.height / 2)
         
+        // Parameters for the Archimedean spiral
+        let a = distanceToCenter
+        let theta_total = CGFloat(numberOfCurves) * 2 * .pi
+        let maxRadius = distanceBetweenCircles * CGFloat(numberOfCurves)
+        let b = maxRadius / theta_total
+        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
+        
         // Create smooth spiral path with many points
-        let totalPoints = 300 // More points for smoother spiral
-        let rotationsPerSpiral = CGFloat(numberOfCurves)
-        let maxRadius: CGFloat = distanceBetweenCircles * CGFloat(numberOfCurves) // Match the circle positioning
+        let totalPoints = 100000 // More points for smoother spiral
         
         for i in 0..<totalPoints {
-            let progress = CGFloat(i) / CGFloat(totalPoints - 1)
+            let s = (CGFloat(i) / CGFloat(totalPoints - 1)) * totalPathLength
+            let reversedS = totalPathLength - s
             
-            // Archimedean spiral formula
-            let angle = progress * rotationsPerSpiral * 2 * .pi
-            let radius = distanceToCenter + (progress * maxRadius)
+            // Solve for theta: (b/2) * theta^2 + a * theta - reversedS = 0
+            let discriminant = a * a + 2 * b * reversedS
+            let theta = (-a + sqrt(discriminant)) / b
+            
+            // Calculate angle and radius
+            let angle = theta
+            let radius = distanceToCenter + b * theta
             
             let x = center.x + radius * cos(angle)
             let y = center.y + radius * sin(angle)
