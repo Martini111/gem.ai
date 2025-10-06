@@ -35,8 +35,7 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.clear
-
+                Color.gray.opacity(0.3).ignoresSafeArea()
                 // Use TimelineView to drive momentum and smooth updates
                 TimelineView(.animation) { timeline in
                     // Spiral carousel - properly centered
@@ -48,43 +47,6 @@ struct ContentView: View {
                         circleSize: circleSize,
                         centerCircleSize: centerCircleSize,
                         spiralOffset: spiralOffset + dragOffset
-                    )
-                    .frame(width: geometry.size.width, height: geometry.size.height - 150)
-                    .position(x: geometry.size.width / 2, y: (geometry.size.height - 150) / 2)
-                    // Attach vertical drag gesture to control spiral with swipe up/down
-                    .gesture(
-                        DragGesture()
-                            .updating($dragOffset) { value, state, _ in
-                                // Stop any ongoing momentum while user is dragging
-                                velocity = 0
-                                let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
-                                // live movement should follow finger directly
-                                state = verticalSign * value.translation.height * 3.0
-                            }
-                            .onEnded { value in
-                                let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
-                                // prefer predicted end translation for momentum feel
-                                let rawTranslation = value.predictedEndTranslation.height != 0 ? value.predictedEndTranslation.height : value.translation.height
-                                let delta = verticalSign * rawTranslation * 3.0
-
-                                // Convert delta into a starting velocity (points/sec). Use a short predicted timeframe
-                                // predictedEndTranslation often represents displacement over ~0.1-0.2s, but to be safe we scale
-                                var initialVelocity = delta * 10.0
-
-                                // Clamp velocity so very quick swipes won't move items too fast
-                                let maxVel = maxVelocityMultiplier * distanceBetweenCircles
-                                if initialVelocity > maxVel { initialVelocity = maxVel }
-                                if initialVelocity < -maxVel { initialVelocity = -maxVel }
-
-                                // If velocity is very small, just apply delta immediately and don't start momentum
-                                if abs(initialVelocity) < 5 {
-                                    spiralOffset += delta
-                                    velocity = 0
-                                } else {
-                                    // start momentum
-                                    velocity = initialVelocity
-                                }
-                            }
                     )
                     // Update momentum on each timeline tick
                     .onChange(of: timeline.date) { _, now in
@@ -104,9 +66,40 @@ struct ContentView: View {
                         lastUpdateDate = now
                     }
                 }
+            }.gesture(
+                DragGesture()
+                    .updating($dragOffset) { value, state, _ in
+                        // Stop any ongoing momentum while user is dragging
+                        velocity = 0
+                        let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
+                        // live movement should follow finger directly
+                        state = verticalSign * value.translation.height * 3.0
+                    }
+                    .onEnded { value in
+                        let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
+                        // prefer predicted end translation for momentum feel
+                        let rawTranslation = value.predictedEndTranslation.height != 0 ? value.predictedEndTranslation.height : value.translation.height
+                        let delta = verticalSign * rawTranslation * 3.0
 
-                // Removed ruler dragger - vertical swipe replaces it
-            }
+                        // Convert delta into a starting velocity (points/sec). Use a short predicted timeframe
+                        // predictedEndTranslation often represents displacement over ~0.1-0.2s, but to be safe we scale
+                        var initialVelocity = delta * 10.0
+
+                        // Clamp velocity so very quick swipes won't move items too fast
+                        let maxVel = maxVelocityMultiplier * distanceBetweenCircles
+                        if initialVelocity > maxVel { initialVelocity = maxVel }
+                        if initialVelocity < -maxVel { initialVelocity = -maxVel }
+
+                        // If velocity is very small, just apply delta immediately and don't start momentum
+                        if abs(initialVelocity) < 5 {
+                            spiralOffset += delta
+                            velocity = 0
+                        } else {
+                            // start momentum
+                            velocity = initialVelocity
+                        }
+                    }
+            )
         }
         .ignoresSafeArea()
     }
@@ -133,7 +126,7 @@ struct SpiralCarousel: View {
                     distanceBetweenCircles: distanceBetweenCircles,
                     numberOfItems: numberOfItems
                 )
-                .stroke(Color.black.opacity(0.3), lineWidth: 2)
+                .stroke(Color.black.opacity(0.2), lineWidth: 2)
                 
                 // Center circle
                 Circle()
