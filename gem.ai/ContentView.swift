@@ -14,11 +14,11 @@ struct ContentView: View {
         case topToBottom
     }
     let swipeDirection: SwipeDirection = .bottomToTop
-    let numberOfItems: Int = 10
-    let distanceBetweenCircles: CGFloat = 80
+    let numberOfItems: Int = 15
+    let distanceBetweenCircles: CGFloat = 100
     let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
-    let circleSize: CGFloat = 60
-    let centerCircleSize: CGFloat = 150
+    let circleSize: CGFloat = 90
+    let centerCircleSize: CGFloat = 200
     // Maximum velocity (points per second) to cap fast swipes
     let maxVelocityMultiplier: CGFloat = 40
     // velocity decay (per second) for momentum
@@ -144,7 +144,7 @@ struct SpiralCarousel: View {
                     
                 // Center circle
                 Circle()
-                    .fill(Color.red)
+                    .fill(Color.gray)
                     .frame(width: centerCircleSize, height: centerCircleSize)
                     .position(center)
                 }
