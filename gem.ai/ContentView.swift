@@ -15,13 +15,13 @@ struct ContentView: View {
     }
     let swipeDirection: SwipeDirection = .bottomToTop
     let numberOfItems: Int = 20
-    let distanceBetweenCircles: CGFloat = 5
+    let distanceBetweenCircles: CGFloat = 100
     let numberOfSpiralCurves: Int = 3
-    let distanceToCenter: CGFloat = 60 // radius at which first circle is placed
-    let circleSize: CGFloat = 30
-    let centerCircleSize: CGFloat = 60
+    let distanceToCenter: CGFloat = 150 // radius at which first circle is placed
+    let circleSize: CGFloat = 40
+    let centerCircleSize: CGFloat = 200
     // Maximum velocity (points per second) to cap fast swipes
-    let maxVelocityMultiplier: CGFloat = 40 // multiplied by distanceBetweenCircles
+    let maxVelocityMultiplier: CGFloat = 40
     // velocity decay (per second) for momentum
     let velocityDecayPerSecond: CGFloat = 6.0
 
@@ -101,7 +101,6 @@ struct ContentView: View {
                     }
             )
         }
-        .ignoresSafeArea()
     }
 }
 
