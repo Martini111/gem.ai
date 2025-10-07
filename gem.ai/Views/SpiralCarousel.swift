@@ -10,6 +10,10 @@ struct SpiralCarousel: View {
     let distanceBetweenItems: CGFloat
     let minCurves: Int
 
+    var items: [SpiralItem] {
+        generateSpiralItems(count: numberOfItems)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
@@ -24,18 +28,23 @@ struct SpiralCarousel: View {
                 )
                 .stroke(Color.black.opacity(0.2), lineWidth: 2)
 
-                ForEach(0..<numberOfItems, id: \.self) { index in
-                    let position = spiralPosition(for: index, center: center)
+                ForEach(items, id: \.id) { item in
+                    let position = spiralPosition(for: item.id, center: center)
 
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: circleSize, height: circleSize)
-                        .position(position)
+                    ZStack {
+                        Circle()
+                            .fill(item.color)
+                            .frame(width: circleSize, height: circleSize)
+                        Text("\(item.id)")
+                            .foregroundColor(.white)
+                            .font(.system(size: circleSize / 4))
+                    }
+                    .position(position)
                 }
 
                 // Center circle
                 Circle()
-                    .fill(Color.red)
+                    .fill(Color.gray)
                     .frame(width: centerCircleSize, height: centerCircleSize)
                     .position(center)
             }
