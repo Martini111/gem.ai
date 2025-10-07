@@ -30,7 +30,7 @@ struct ContentView: View {
     let velocityDecayPerSecond: CGFloat = 8.0
     let distanceBetweenItems: CGFloat = 100
     let minCurves: Int = 3
-    let swipeSensitivity: CGFloat = 0.1
+    let swipeSensitivity: CGFloat = 0.2
 
     @State private var spiralOffset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
