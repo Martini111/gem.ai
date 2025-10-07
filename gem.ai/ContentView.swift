@@ -228,8 +228,13 @@ struct SpiralPath: Shape {
         let drawLength = max(totalPathLength, minS)
         
         // Create smooth spiral path with many points
-        let totalPoints = 100000 // More points for smoother spiral
-        
+        // Adaptive sampling: pick number of points based on the length we need to draw
+        // This keeps the curve smooth but avoids extremely large arrays on big draw lengths.
+        let targetPointSpacing: CGFloat = 2.0 // desired spacing between points (in points/pixels)
+        let estimatedPoints = max(Int((drawLength / targetPointSpacing).rounded()), 200)
+        let maxPoints = 5000 // upper bound to avoid heavy CPU/GPU work
+        let totalPoints = min(estimatedPoints, maxPoints)
+
         for i in 0..<totalPoints {
             let s = (CGFloat(i) / CGFloat(totalPoints - 1)) * drawLength
             let reversedS = drawLength - s
