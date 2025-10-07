@@ -19,6 +19,7 @@ struct ContentView: View {
     }
     let swipeDirection: SwipeDirection = .topToBottom
     let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
+    let disableHorizontalSwipe: Bool = true
     let numberOfItems: Int = 15
     let distanceBetweenCircles: CGFloat = 100
     let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
@@ -80,14 +81,17 @@ struct ContentView: View {
                         // Stop any ongoing momentum while user is dragging
                         velocity = 0
                         let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
-                        if isHorizontal {
+                        if isHorizontal && !disableHorizontalSwipe {
                             let horizontalSign: CGFloat = (horizontalSwipeDirection == .leftToRight) ? 1.0 : -1.0
                             // live movement should follow finger directly
                             state = horizontalSign * value.translation.width * swipeSensitivity
-                        } else {
+                        } else if !isHorizontal {
                             let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
                             // live movement should follow finger directly
                             state = verticalSign * value.translation.height * swipeSensitivity
+                        } else {
+                            // Horizontal swipe disabled, no movement
+                            state = 0
                         }
                     }
                     .onEnded { value in
@@ -95,14 +99,17 @@ struct ContentView: View {
                         let rawHeight = value.predictedEndTranslation.height != 0 ? value.predictedEndTranslation.height : value.translation.height
                         let isHorizontal = abs(rawWidth) > abs(rawHeight)
                         var delta: CGFloat = 0
-                        if isHorizontal {
+                        if isHorizontal && !disableHorizontalSwipe {
                             let horizontalSign: CGFloat = (horizontalSwipeDirection == .leftToRight) ? 1.0 : -1.0
                             // prefer predicted end translation for momentum feel
                             delta = horizontalSign * rawWidth * swipeSensitivity
-                        } else {
+                        } else if !isHorizontal {
                             let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
                             // prefer predicted end translation for momentum feel
                             delta = verticalSign * rawHeight * swipeSensitivity
+                        } else {
+                            // Horizontal swipe disabled, no delta
+                            delta = 0
                         }
 
                         // Convert delta into a starting velocity (points/sec). Use a short predicted timeframe
