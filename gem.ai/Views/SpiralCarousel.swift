@@ -17,6 +17,9 @@ struct SpiralCarousel: View {
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
+            let temp = floor((totalPathLength - spiralOffset) / distanceBetweenItems)
+            let centerIndex = ((Int(temp) % numberOfItems) + numberOfItems) % numberOfItems
 
             ZStack {
                 SpiralPath(
@@ -28,25 +31,28 @@ struct SpiralCarousel: View {
                 )
                 .stroke(Color.black.opacity(0.2), lineWidth: 2)
 
-                ForEach(items, id: \.id) { item in
-                    let position = spiralPosition(for: item.id, center: center)
+                ForEach(Array(items.enumerated()), id: \.element.id) { (index, item) in
+                    let position = spiralPosition(for: index, center: center)
 
                     ZStack {
                         Circle()
                             .fill(item.color)
                             .frame(width: circleSize, height: circleSize)
-                        Text("\(item.id)")
-                            .foregroundColor(.white)
-                            .font(.system(size: circleSize / 4))
                     }
                     .position(position)
                 }
-
+                
                 // Center circle
-                Circle()
-                    .fill(Color.gray)
-                    .frame(width: centerCircleSize, height: centerCircleSize)
-                    .position(center)
+                ZStack {
+                    let centerItem = items[centerIndex]
+                    Circle()
+                        .fill(centerItem.color)
+                        .frame(width: centerCircleSize, height: centerCircleSize)
+                    Text(centerItem.type.rawValue)
+                        .foregroundColor(.white)
+                        .font(.system(size: centerCircleSize / 4))
+                }
+                .position(center)
             }
         }
     }
