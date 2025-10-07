@@ -35,7 +35,7 @@ struct ContentView: View {
     }
 
     // Choose active preset here (no UI control added per request)
-    private let animationPreset: AnimationPreset = .slow
+    private let animationPreset: AnimationPreset = .fast
 
     // Preset values (tweak these if you want different defaults)
     struct PresetConfig {
