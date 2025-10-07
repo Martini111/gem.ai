@@ -29,11 +29,41 @@ struct ContentView: View {
     let minCurves: Int = 3
     
     // Animation and gesture tuning
-    // Maximum velocity (points per second) to cap fast swipes
-    let maxVelocityMultiplier: CGFloat = 40
-    // velocity decay (per second) for momentum
-    let velocityDecayPerSecond: CGFloat = 8.0
-    let swipeSensitivity: CGFloat = 0.3
+    // Animation presets — pick one by changing `animationPreset`
+    enum AnimationPreset {
+        case fast, medium, smooth, slow, highSensitivity
+    }
+
+    // Choose active preset here (no UI control added per request)
+    private let animationPreset: AnimationPreset = .slow
+
+    // Preset values (tweak these if you want different defaults)
+    struct PresetConfig {
+        let maxVelocityMultiplier: CGFloat
+        let velocityDecayPerSecond: CGFloat
+        let swipeSensitivity: CGFloat
+
+        static let fast = PresetConfig(maxVelocityMultiplier: 24.0, velocityDecayPerSecond: 6.0, swipeSensitivity: 0.42)
+        static let medium = PresetConfig(maxVelocityMultiplier: 12.0, velocityDecayPerSecond: 3.0, swipeSensitivity: 0.25)
+        static let smooth = PresetConfig(maxVelocityMultiplier: 10.0, velocityDecayPerSecond: 0.8, swipeSensitivity: 0.22)
+        static let slow = PresetConfig(maxVelocityMultiplier: 6.0, velocityDecayPerSecond: 8.0, swipeSensitivity: 0.16)
+        static let highSensitivity = PresetConfig(maxVelocityMultiplier: 32.0, velocityDecayPerSecond: 2.0, swipeSensitivity: 0.6)
+    }
+
+    private var currentPreset: PresetConfig {
+        switch animationPreset {
+        case .fast: return .fast
+        case .medium: return .medium
+        case .smooth: return .smooth
+        case .slow: return .slow
+        case .highSensitivity: return .highSensitivity
+        }
+    }
+
+    // Expose the actual tuning values used by the logic below
+    var maxVelocityMultiplier: CGFloat { currentPreset.maxVelocityMultiplier }
+    var velocityDecayPerSecond: CGFloat { currentPreset.velocityDecayPerSecond }
+    var swipeSensitivity: CGFloat { currentPreset.swipeSensitivity }
 
     @State private var spiralOffset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
