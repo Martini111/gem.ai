@@ -13,7 +13,12 @@ struct ContentView: View {
         case bottomToTop
         case topToBottom
     }
-    let swipeDirection: SwipeDirection = .bottomToTop
+    enum HorizontalSwipeDirection {
+        case leftToRight
+        case rightToLeft
+    }
+    let swipeDirection: SwipeDirection = .topToBottom
+    let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
     let numberOfItems: Int = 15
     let distanceBetweenCircles: CGFloat = 100
     let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
@@ -74,15 +79,31 @@ struct ContentView: View {
                     .updating($dragOffset) { value, state, _ in
                         // Stop any ongoing momentum while user is dragging
                         velocity = 0
-                        let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
-                        // live movement should follow finger directly
-                        state = verticalSign * value.translation.height * swipeSensitivity
+                        let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
+                        if isHorizontal {
+                            let horizontalSign: CGFloat = (horizontalSwipeDirection == .leftToRight) ? 1.0 : -1.0
+                            // live movement should follow finger directly
+                            state = horizontalSign * value.translation.width * swipeSensitivity
+                        } else {
+                            let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
+                            // live movement should follow finger directly
+                            state = verticalSign * value.translation.height * swipeSensitivity
+                        }
                     }
                     .onEnded { value in
-                        let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
-                        // prefer predicted end translation for momentum feel
-                        let rawTranslation = value.predictedEndTranslation.height != 0 ? value.predictedEndTranslation.height : value.translation.height
-                        let delta = verticalSign * rawTranslation * swipeSensitivity
+                        let rawWidth = value.predictedEndTranslation.width != 0 ? value.predictedEndTranslation.width : value.translation.width
+                        let rawHeight = value.predictedEndTranslation.height != 0 ? value.predictedEndTranslation.height : value.translation.height
+                        let isHorizontal = abs(rawWidth) > abs(rawHeight)
+                        var delta: CGFloat = 0
+                        if isHorizontal {
+                            let horizontalSign: CGFloat = (horizontalSwipeDirection == .leftToRight) ? 1.0 : -1.0
+                            // prefer predicted end translation for momentum feel
+                            delta = horizontalSign * rawWidth * swipeSensitivity
+                        } else {
+                            let verticalSign: CGFloat = (swipeDirection == .bottomToTop) ? -1.0 : 1.0
+                            // prefer predicted end translation for momentum feel
+                            delta = verticalSign * rawHeight * swipeSensitivity
+                        }
 
                         // Convert delta into a starting velocity (points/sec). Use a short predicted timeframe
                         // predictedEndTranslation often represents displacement over ~0.1-0.2s, but to be safe we scale
