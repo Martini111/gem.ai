@@ -13,7 +13,7 @@ struct ContentView: View {
         case bottomToTop
         case topToBottom
     }
-    let swipeDirection: SwipeDirection = .topToBottom
+    let swipeDirection: SwipeDirection = .bottomToTop
     let numberOfItems: Int = 15
     let distanceBetweenCircles: CGFloat = 100
     let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
@@ -22,10 +22,10 @@ struct ContentView: View {
     // Maximum velocity (points per second) to cap fast swipes
     let maxVelocityMultiplier: CGFloat = 40
     // velocity decay (per second) for momentum
-    let velocityDecayPerSecond: CGFloat = 5.0
+    let velocityDecayPerSecond: CGFloat = 8.0
     let distanceBetweenItems: CGFloat = 100
     let minCurves: Int = 3
-    let swipeSensitivity: CGFloat = 1
+    let swipeSensitivity: CGFloat = 0.1
 
     @State private var spiralOffset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
