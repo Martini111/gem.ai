@@ -10,8 +10,38 @@ struct SpiralCarousel: View {
     let distanceBetweenItems: CGFloat
     let minCurves: Int
 
-    var items: [SpiralItem] {
-        generateSpiralItems(count: numberOfItems)
+    // Store generated items so their ids are stable across view updates
+    @State private var generatedItems: [SpiralItem]
+
+    // New state requested by user: ordered IDs from first on spiral (outer) to last (center)
+    @State private var orderedIDS: [UUID] = []
+
+    // Keep last center index to detect when an item reaches the center
+    @State private var lastCenterIndex: Int? = nil
+
+    init(
+        numberOfItems: Int,
+        distanceBetweenCircles: CGFloat,
+        distanceToCenter: CGFloat,
+        circleSize: CGFloat,
+        centerCircleSize: CGFloat,
+        spiralOffset: CGFloat,
+        distanceBetweenItems: CGFloat,
+        minCurves: Int
+    ) {
+        self.numberOfItems = numberOfItems
+        self.distanceBetweenCircles = distanceBetweenCircles
+        self.distanceToCenter = distanceToCenter
+        self.circleSize = circleSize
+        self.centerCircleSize = centerCircleSize
+        self.spiralOffset = spiralOffset
+        self.distanceBetweenItems = distanceBetweenItems
+        self.minCurves = minCurves
+
+        // Initialize state-backed items with stable UUIDs
+        _generatedItems = State(initialValue: generateSpiralItems(count: numberOfItems))
+        // Initial ordered IDS will be set onAppear (geometry available) — keep empty for now
+        _orderedIDS = State(initialValue: _generatedItems.wrappedValue.map { $0.id })
     }
 
     var body: some View {
@@ -31,29 +61,76 @@ struct SpiralCarousel: View {
                 )
                 .stroke(Color.black.opacity(0.2), lineWidth: 2)
 
-                ForEach(Array(items.enumerated()), id: \.element.id) { (index, item) in
+                ForEach(Array(generatedItems.enumerated()), id: \.element.id) { (index, item) in
                     let position = spiralPosition(for: index, center: center)
 
                     ZStack {
                         Circle()
                             .fill(item.color)
                             .frame(width: circleSize, height: circleSize)
+                        Text(item.id.uuidString.prefix(4))
+                         .foregroundColor(.white)
+                         .font(.system(size: 20))
+                                   
                     }
                     .position(position)
                 }
-                
+
                 // Center circle
                 ZStack {
-                    let centerItem = items[centerIndex]
+                    let curIdx = orderedIDS.last
+                    let curItem = generatedItems.first(where: { $0.id == curIdx })
                     Circle()
-                        .fill(centerItem.color)
+                        .fill(curItem?.color ?? Color.blue)
                         .frame(width: centerCircleSize, height: centerCircleSize)
-                    Text(centerItem.type.rawValue)
+                    Text(curItem?.id.uuidString.prefix(4) ?? "")
                         .foregroundColor(.white)
                         .font(.system(size: centerCircleSize / 4))
                 }
                 .position(center)
             }
+            // When the view appears, compute initial ordering
+            .onAppear {
+                updateOrderedIDs(spiralOffset: spiralOffset)
+                lastCenterIndex = centerIndex
+            }
+            // Update ordered IDs when center index changes — this indicates an item reached the end/center
+            .onChange(of: centerIndex) { _, newCenter in
+                // Only update when actual change occurs
+                if lastCenterIndex != newCenter {
+                    lastCenterIndex = newCenter
+                    updateOrderedIDs(spiralOffset: spiralOffset)
+                }
+            }
+        }
+    }
+
+    private func updateOrderedIDs(spiralOffset: CGFloat) {
+        // Compute the path position 's' for each item index, then sort by it so first element
+        // corresponds to the start of the spiral and last is the center.
+        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
+
+        var indexedS: [(index: Int, s: CGFloat)] = []
+        for i in 0..<numberOfItems {
+            let adjustedPosition = (CGFloat(i) * distanceBetweenItems + spiralOffset)
+                .truncatingRemainder(dividingBy: totalPathLength)
+            let s = adjustedPosition < 0 ? adjustedPosition + totalPathLength : adjustedPosition
+            indexedS.append((index: i, s: s))
+        }
+
+        // Sort by s ascending. This yields order along the spiral path. The last element will be
+        // the one closest to the end of the path (center).
+        indexedS.sort { $0.s < $1.s }
+
+        // Map to IDs. If generatedItems changed size for any reason, guard indexes.
+        let ids: [UUID] = indexedS.compactMap { pair in
+            guard pair.index >= 0 && pair.index < generatedItems.count else { return nil }
+            return generatedItems[pair.index].id
+        }
+
+        // Assign on main thread to avoid SwiftUI warnings when called from view updates
+        DispatchQueue.main.async {
+            self.orderedIDS = ids
         }
     }
 
