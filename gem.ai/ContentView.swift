@@ -35,6 +35,7 @@ struct ContentView: View {
     private var dynamicCenterCircleSize: CGFloat { centerCircleSize + CGFloat(pinchLevel) * 10.0 }
     private var dynamicDistanceToCenter: CGFloat { distanceToCenter + CGFloat(pinchLevel) * 10.0 }
     private var dynamicDistanceBetweenCircles: CGFloat { distanceBetweenCircles + CGFloat(pinchLevel) * 10.0 }
+    private var dynamicDistanceBetweenItems: CGFloat { distanceBetweenItems + CGFloat(pinchLevel) * 10.0 }
 
     // Animation and gesture tuning
     // Animation presets — pick one by changing `animationPreset`
@@ -94,7 +95,7 @@ struct ContentView: View {
                         circleSize: dynamicCircleSize,
                         centerCircleSize: dynamicCenterCircleSize,
                         spiralOffset: spiralOffset + dragOffset,
-                        distanceBetweenItems: distanceBetweenItems,
+                        distanceBetweenItems: dynamicDistanceBetweenItems,
                         minCurves: minCurves
                     )
                     // Update momentum on each timeline tick
@@ -157,7 +158,7 @@ struct ContentView: View {
                         var initialVelocity = delta * 10.0
 
                         // Clamp velocity so very quick swipes won't move items too fast
-                        let maxVel = maxVelocityMultiplier * dynamicDistanceBetweenCircles
+                        let maxVel = maxVelocityMultiplier * dynamicDistanceBetweenItems
                         if initialVelocity > maxVel { initialVelocity = maxVel }
                         if initialVelocity < -maxVel { initialVelocity = -maxVel }
 
@@ -180,14 +181,14 @@ struct ContentView: View {
                         let pinchOutThreshold: CGFloat = 1.05
                         if scale < pinchInThreshold {
                             // Pinch in (fingers together) -> increase curves and reduce sizes
-                            withAnimation(.easeOut) {
+                            withAnimation(.bouncy) {
                                 minCurves += 2
                                 // decrease pinch level (more negative), clamp to -3
                                 pinchLevel = max(-3, pinchLevel - 1)
                             }
                         } else if scale > pinchOutThreshold {
                             // Pinch out (fingers apart) -> decrease curves and increase sizes
-                            withAnimation(.easeOut) {
+                            withAnimation(.bouncy) {
                                 minCurves = max(1, minCurves - 2)
                                 // increase pinch level, clamp to +3
                                 pinchLevel = min(3, pinchLevel + 1)
