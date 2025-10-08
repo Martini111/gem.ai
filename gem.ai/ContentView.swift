@@ -133,10 +133,10 @@ struct ContentView: View {
                             
                             let finalOffset = sign * (translation + velocity * 0.1) * config.sensitivity
                             
-//                            withAnimation(config.animation) {
+                            withAnimation(config.animation) {
                                 spiralOffset += finalOffset
                                 dragTranslation = 0
-//                            }
+                            }
                         } else if !isHorizontal {
                             let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
                             translation = value.translation.height
@@ -144,10 +144,10 @@ struct ContentView: View {
                             
                             let finalOffset = sign * (translation + velocity * 0.1) * config.sensitivity
                             
-//                            withAnimation(config.animation) {
+                            withAnimation(config.animation) {
                                 spiralOffset += finalOffset
                                 dragTranslation = 0
-//                            }
+                            }
                         } else {
                             dragTranslation = 0
                         }
@@ -160,15 +160,15 @@ struct ContentView: View {
                         let pinchOutThreshold: CGFloat = 1.05
                         
                         if scale < pinchInThreshold {
-//                            withAnimation(.bouncy) {
+                            withAnimation(.bouncy.speed(2)) {
                                 minCurves += 2
                                 pinchLevel = max(-3, pinchLevel - 1)
-//                            }
+                            }
                         } else if scale > pinchOutThreshold {
-//                            withAnimation(.bouncy) {
+                            withAnimation(.bouncy.speed(2)) {
                                 minCurves = max(1, minCurves - 2)
                                 pinchLevel = min(3, pinchLevel + 1)
-//                            }
+                            }
                         }
                     }
             )
