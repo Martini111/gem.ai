@@ -20,7 +20,7 @@ struct ContentView: View {
     let swipeDirection: SwipeDirection = .topToBottom
     let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
     let disableHorizontalSwipe: Bool = false
-    let numberOfItems: Int = 50
+    let numberOfItems: Int = 200
     let distanceBetweenItems: CGFloat = 100
     let distanceBetweenCircles: CGFloat = 100
     let distanceToCenter: CGFloat = 80
@@ -44,7 +44,7 @@ struct ContentView: View {
             switch self {
             case .fast:
                 return AnimationConfig(
-                    sensitivity: 0.65,
+                    sensitivity: 0.55,
                     response: 0.3,
                     dampingFraction: 0.7
                 )
@@ -133,10 +133,10 @@ struct ContentView: View {
                             
                             let finalOffset = sign * (translation + velocity * 0.1) * config.sensitivity
                             
-                            withAnimation(config.animation) {
+//                            withAnimation(config.animation) {
                                 spiralOffset += finalOffset
                                 dragTranslation = 0
-                            }
+//                            }
                         } else if !isHorizontal {
                             let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
                             translation = value.translation.height
@@ -144,10 +144,10 @@ struct ContentView: View {
                             
                             let finalOffset = sign * (translation + velocity * 0.1) * config.sensitivity
                             
-                            withAnimation(config.animation) {
+//                            withAnimation(config.animation) {
                                 spiralOffset += finalOffset
                                 dragTranslation = 0
-                            }
+//                            }
                         } else {
                             dragTranslation = 0
                         }
@@ -160,15 +160,15 @@ struct ContentView: View {
                         let pinchOutThreshold: CGFloat = 1.05
                         
                         if scale < pinchInThreshold {
-                            withAnimation(.bouncy) {
+//                            withAnimation(.bouncy) {
                                 minCurves += 2
                                 pinchLevel = max(-3, pinchLevel - 1)
-                            }
+//                            }
                         } else if scale > pinchOutThreshold {
-                            withAnimation(.bouncy) {
+//                            withAnimation(.bouncy) {
                                 minCurves = max(1, minCurves - 2)
                                 pinchLevel = min(3, pinchLevel + 1)
-                            }
+//                            }
                         }
                     }
             )
