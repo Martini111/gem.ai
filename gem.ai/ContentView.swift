@@ -20,14 +20,22 @@ struct ContentView: View {
     let swipeDirection: SwipeDirection = .topToBottom
     let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
     let disableHorizontalSwipe: Bool = false
-    let numberOfItems: Int = 15
+    let numberOfItems: Int = 50
     let distanceBetweenItems: CGFloat = 100
     let distanceBetweenCircles: CGFloat = 100
     let distanceToCenter: CGFloat = 80 // radius at which first circle is placed
     let circleSize: CGFloat = 90
     let centerCircleSize: CGFloat = 200
-    let minCurves: Int = 3
-    
+    @State private var minCurves: Int = 1
+    // Pinch/zoom levels: -3..3. Each level adjusts sizes by 10 points.
+    @State private var pinchLevel: Int = 0
+
+    // Computed dynamic values that change with pinchLevel
+    private var dynamicCircleSize: CGFloat { circleSize + CGFloat(pinchLevel) * 10.0 }
+    private var dynamicCenterCircleSize: CGFloat { centerCircleSize + CGFloat(pinchLevel) * 10.0 }
+    private var dynamicDistanceToCenter: CGFloat { distanceToCenter + CGFloat(pinchLevel) * 10.0 }
+    private var dynamicDistanceBetweenCircles: CGFloat { distanceBetweenCircles + CGFloat(pinchLevel) * 10.0 }
+
     // Animation and gesture tuning
     // Animation presets — pick one by changing `animationPreset`
     enum AnimationPreset {
@@ -81,10 +89,10 @@ struct ContentView: View {
                     // Spiral carousel - properly centered
                     SpiralCarousel(
                         numberOfItems: numberOfItems,
-                        distanceBetweenCircles: distanceBetweenCircles,
-                        distanceToCenter: distanceToCenter,
-                        circleSize: circleSize,
-                        centerCircleSize: centerCircleSize,
+                        distanceBetweenCircles: dynamicDistanceBetweenCircles,
+                        distanceToCenter: dynamicDistanceToCenter,
+                        circleSize: dynamicCircleSize,
+                        centerCircleSize: dynamicCenterCircleSize,
                         spiralOffset: spiralOffset + dragOffset,
                         distanceBetweenItems: distanceBetweenItems,
                         minCurves: minCurves
@@ -149,7 +157,7 @@ struct ContentView: View {
                         var initialVelocity = delta * 10.0
 
                         // Clamp velocity so very quick swipes won't move items too fast
-                        let maxVel = maxVelocityMultiplier * distanceBetweenCircles
+                        let maxVel = maxVelocityMultiplier * dynamicDistanceBetweenCircles
                         if initialVelocity > maxVel { initialVelocity = maxVel }
                         if initialVelocity < -maxVel { initialVelocity = -maxVel }
 
@@ -160,6 +168,30 @@ struct ContentView: View {
                         } else {
                             // start momentum
                             velocity = initialVelocity
+                        }
+                    }
+            )
+            // Add pinch (magnification) gesture alongside drag. Pinch IN (scale < 1) -> increase minCurves by 2.
+            // Pinch OUT (scale > 1) -> decrease minCurves by 2. Use thresholds to avoid tiny accidental changes.
+            .simultaneousGesture(
+                MagnificationGesture()
+                    .onEnded { scale in
+                        let pinchInThreshold: CGFloat = 0.95
+                        let pinchOutThreshold: CGFloat = 1.05
+                        if scale < pinchInThreshold {
+                            // Pinch in (fingers together) -> increase curves and reduce sizes
+                            withAnimation(.easeOut) {
+                                minCurves += 2
+                                // decrease pinch level (more negative), clamp to -3
+                                pinchLevel = max(-3, pinchLevel - 1)
+                            }
+                        } else if scale > pinchOutThreshold {
+                            // Pinch out (fingers apart) -> decrease curves and increase sizes
+                            withAnimation(.easeOut) {
+                                minCurves = max(1, minCurves - 2)
+                                // increase pinch level, clamp to +3
+                                pinchLevel = min(3, pinchLevel + 1)
+                            }
                         }
                     }
             )
