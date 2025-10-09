@@ -61,19 +61,22 @@ struct SpiralCarousel: View {
                 )
                 .stroke(Color.black.opacity(0.2), lineWidth: 2)
 
+                // Кружечки на спіралі
                 ForEach(Array(generatedItems.enumerated()), id: \.element.id) { (index, item) in
                     let position = spiralPosition(for: index, center: center)
+                    let isEdge = (orderedIDS.first == item.id) || (orderedIDS.last == item.id)
 
                     ZStack {
                         Circle()
                             .fill(item.color)
                             .frame(width: circleSize, height: circleSize)
                         Text(item.id.uuidString.prefix(4))
-                         .foregroundColor(.white)
-                         .font(.system(size: 20))
-                                   
+                            .foregroundColor(.white)
+                            .font(.system(size: 20))
                     }
                     .position(position)
+                    .opacity(isEdge ? 0 : 1)
+                    .animation(.easeInOut(duration: 0.1), value: orderedIDS)
                 }
 
                 // Center circle
