@@ -7,7 +7,7 @@ struct SpiralItemView: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 28)
             .fill(item.color)
-            .stroke(Color.black, lineWidth: 4)
+            .stroke(Color.white, lineWidth: 4)
             .frame(width: circleSize, height: circleSize)
             .overlay(
                 Text(item.id.uuidString.prefix(4))

@@ -95,7 +95,7 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.gray.opacity(0.3).ignoresSafeArea()
+                Color("BGColor").ignoresSafeArea()
                 
                 SpiralCarousel(
                     numberOfItems: numberOfItems,

@@ -59,7 +59,7 @@ struct SpiralCarousel: View {
                     numberOfItems: numberOfItems,
                     distanceBetweenItems: distanceBetweenItems
                 )
-                .stroke(Color.black.opacity(0.2), lineWidth: 2)
+                .stroke(Color.white.opacity(0.4), lineWidth: 1)
 
                 // Кружечки на спіралі
                 ForEach($generatedItems, id: \.id) { $item in
