@@ -24,6 +24,10 @@ struct SpiralCarousel: View {
     // Dropped item for center circle
     @State private var centerItem: SpiralItem? = nil
 
+    // Popup state: show transient popup when centerItem changes
+    @State private var showCenterPopup: Bool = false
+    @State private var popupMessage: String = ""
+
     // --- Drag & drop state ---
     @State private var draggingItem: SpiralItem? = nil
     @State private var dragStartPosition: CGPoint = .zero
@@ -80,7 +84,6 @@ struct SpiralCarousel: View {
                 )
                 .stroke(Color.white.opacity(0.4), lineWidth: 1)
 
-                // Кружечки на спіралі
                 ForEach($generatedItems, id: \.id) { $item in
                     let item = $item.wrappedValue
                     let index = generatedItems.firstIndex(where: { $0.id == item.id })!
@@ -93,7 +96,7 @@ struct SpiralCarousel: View {
 
                     // Pass position and drag callbacks to the item view. The item view will not move;
                     // we create a separate preview that follows the finger.
-                    return SpiralItemView(
+                    SpiralItemView(
                         item: item,
                         circleSize: circleSize,
                         centerPosition: position,
@@ -143,7 +146,7 @@ struct SpiralCarousel: View {
                 // Center circle
                 ZStack {
                     let curIdx = orderedIDS.last
-                    let curItem = centerItem ?? generatedItems.first(where: { $0.id == curIdx })
+                    let curItem = generatedItems.first(where: { $0.id == curIdx })
                     Circle()
                         .fill(curItem?.color ?? Color.blue)
                         .frame(width: centerCircleSize, height: centerCircleSize)
@@ -168,20 +171,31 @@ struct SpiralCarousel: View {
 
                 // Floating drag preview (renders above everything)
                 if let dragging = draggingItem, showPreview {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 28)
-                            .fill(dragging.color.opacity(0.9))
-                        RoundedRectangle(cornerRadius: 28)
-                            .stroke(Color.white, lineWidth: 4)
-                        Text(dragging.id.uuidString.prefix(4))
+                    SpiralItemPreviewView(item: dragging, size: circleSize * 0.95)
+                        .position(dragLocation)
+                        .shadow(radius: 6)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.12), value: showPreview)
+                }
+
+                // Popup that appears when an item is dropped to center
+                if showCenterPopup {
+                    VStack(spacing: 6) {
+                        Text("Item dropped")
+                            .font(.headline)
                             .foregroundColor(.white)
-                            .font(.system(size: 20))
+                        Text(popupMessage)
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
                     }
-                    .frame(width: circleSize * 0.95, height: circleSize * 0.95)
-                    .position(dragLocation)
+                    .padding(12)
+                    .background(Color.black.opacity(0.8))
+                    .cornerRadius(10)
                     .shadow(radius: 6)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.12), value: showPreview)
+                    .position(x: center.x, y: 80)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.2), value: showCenterPopup)
                 }
             }
             // When the view appears, compute initial ordering
@@ -195,6 +209,31 @@ struct SpiralCarousel: View {
                 if lastCenterIndex != newCenter {
                     lastCenterIndex = newCenter
                     updateOrderedIDs(spiralOffset: spiralOffset)
+                }
+            }
+            // Show popup when centerItem changes (observe id to avoid requiring Equatable on SpiralItem)
+            .onChange(of: centerItem?.id) { (_: UUID?, newID: UUID?) in
+                guard let id = newID, let item = generatedItems.first(where: { $0.id == id }) else {
+                    // hide if centerItem became nil
+                    withAnimation {
+                        showCenterPopup = false
+                    }
+                    return
+                }
+
+                // Build message with short id and type
+                let shortID = String(item.id.uuidString.prefix(8))
+                popupMessage = "ID: \(shortID)\nType: \(item.type.rawValue)"
+
+                withAnimation {
+                    showCenterPopup = true
+                }
+
+                // Auto-hide after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                    withAnimation {
+                        showCenterPopup = false
+                    }
                 }
             }
         }
