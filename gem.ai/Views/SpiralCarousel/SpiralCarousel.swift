@@ -88,7 +88,7 @@ struct SpiralCarousel: View {
                     let item = $item.wrappedValue
                     let index = generatedItems.firstIndex(where: { $0.id == item.id })!
                     let position = spiralPosition(for: index, center: center)
-                    
+
                     let isEndEdge = (orderedIDS.last == item.id)
                     let isStartEdge = (orderedIDS.first == item.id)
 
@@ -100,42 +100,16 @@ struct SpiralCarousel: View {
                         item: item,
                         circleSize: circleSize,
                         centerPosition: position,
-                        onDragStart: { start in
-                            // start is the item's center position in this coordinate space
-                            draggingItem = item
-                            dragStartPosition = start
-                            dragLocation = start
-                            // Inform parent that DnD started via notification
-                            NotificationCenter.default.post(name: .spiralDragDidStart, object: nil)
-                            withAnimation(.easeIn(duration: 0.12)) {
-                                showPreview = true
-                            }
-                        },
-                        onDragChanged: { translation in
-                            // Update preview location relative to drag start
-                            dragLocation = CGPoint(x: dragStartPosition.x + translation.width,
-                                                   y: dragStartPosition.y + translation.height)
-                        },
-                        onDragEnd: { translation in
-                            let final = CGPoint(x: dragStartPosition.x + translation.width,
-                                                y: dragStartPosition.y + translation.height)
-                            // Check if final point is inside center circle
-                            let distanceToCenter = hypot(final.x - center.x, final.y - center.y)
-                            if distanceToCenter <= centerCircleSize / 2 {
-                                // Dropped on center
-                                centerItem = item
-                                onItemDropped?(item)
-                            }
-                            // Hide preview and clear state
-                            withAnimation(.easeOut(duration: 0.18)) {
-                                showPreview = false
-                            }
-                            // Delay clearing to allow fade-out animation
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                                draggingItem = nil
-                                // Inform parent that DnD ended via notification
-                                NotificationCenter.default.post(name: .spiralDragDidEnd, object: nil)
-                            }
+                        center: center,
+                        centerCircleSize: centerCircleSize,
+                        draggingItem: $draggingItem,
+                        dragStartPosition: $dragStartPosition,
+                        dragLocation: $dragLocation,
+                        showPreview: $showPreview,
+                        onItemDropped: { dropped in
+                            // Dropped on center — update centerItem and forward callback
+                            centerItem = dropped
+                            onItemDropped?(dropped)
                         }
                     )
                     .position(position)
@@ -143,31 +117,18 @@ struct SpiralCarousel: View {
                     .animation(.easeInOut(duration: 0), value: orderedIDS)
                 }
 
-                // Center circle
-                ZStack {
-                    let curIdx = orderedIDS.last
-                    let curItem = generatedItems.first(where: { $0.id == curIdx })
-                    Circle()
-                        .fill(curItem?.color ?? Color.blue)
-                        .frame(width: centerCircleSize, height: centerCircleSize)
-                    Text(curItem?.id.uuidString.prefix(4) ?? "")
-                        .foregroundColor(.white)
-                        .font(.system(size: centerCircleSize / 4))
-                }
-                .position(center)
-                .onDrop(of: [UTType.text], isTargeted: nil) { providers in
-                    guard let provider = providers.first else { return false }
-                    provider.loadObject(ofClass: NSString.self) { object, error in
-                        if let string = object as? String, let uuid = UUID(uuidString: string) {
-                            DispatchQueue.main.async {
-                                if let item = generatedItems.first(where: { $0.id == uuid }) {
-                                    centerItem = item
-                                }
-                            }
-                        }
+                // Center circle moved to its own view file
+                SpiralCenterItemView(
+                    centerItem: $centerItem,
+                    orderedIDS: orderedIDS,
+                    generatedItems: generatedItems,
+                    centerCircleSize: centerCircleSize,
+                    onDropItem: { item in
+                        // keep same behavior: notify parent callback
+                        onItemDropped?(item)
                     }
-                    return true
-                }
+                )
+                .position(center)
 
                 // Floating drag preview (renders above everything)
                 if let dragging = draggingItem, showPreview {
@@ -178,25 +139,8 @@ struct SpiralCarousel: View {
                         .animation(.easeInOut(duration: 0.12), value: showPreview)
                 }
 
-                // Popup that appears when an item is dropped to center
-                if showCenterPopup {
-                    VStack(spacing: 6) {
-                        Text("Item dropped")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        Text(popupMessage)
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(12)
-                    .background(Color.black.opacity(0.8))
-                    .cornerRadius(10)
-                    .shadow(radius: 6)
-                    .position(x: center.x, y: 80)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.easeInOut(duration: 0.2), value: showCenterPopup)
-                }
+                // Use GemDetails view (moved popup UI) so the popup is reusable
+                GemDetails(popupMessage: popupMessage, showCenterPopup: showCenterPopup, centerX: center.x)
             }
             // When the view appears, compute initial ordering
             .onAppear {
@@ -212,7 +156,7 @@ struct SpiralCarousel: View {
                 }
             }
             // Show popup when centerItem changes (observe id to avoid requiring Equatable on SpiralItem)
-            .onChange(of: centerItem?.id) { (_: UUID?, newID: UUID?) in
+            .onChange(of: centerItem?.id) { _, newID in
                 guard let id = newID, let item = generatedItems.first(where: { $0.id == id }) else {
                     // hide if centerItem became nil
                     withAnimation {
@@ -239,32 +183,37 @@ struct SpiralCarousel: View {
         }
     }
 
+    // iOS 18 compatible and optimized: rotate a base array of IDs instead of sorting every time
     private func updateOrderedIDs(spiralOffset: CGFloat) {
-        // Compute the path position 's' for each item index, then sort by it so first element
-        // corresponds to the start of the spiral and last is the center.
-        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
-
-        var indexedS: [(index: Int, s: CGFloat)] = []
-        for i in 0..<numberOfItems {
-            let adjustedPosition = (CGFloat(i) * distanceBetweenItems + spiralOffset)
-                .truncatingRemainder(dividingBy: totalPathLength)
-            let s = adjustedPosition < 0 ? adjustedPosition + totalPathLength : adjustedPosition
-            indexedS.append((index: i, s: s))
+        let n = numberOfItems
+        guard n > 0 else {
+            orderedIDS = []
+            return
         }
 
-        // Sort by s ascending. This yields order along the spiral path. The last element will be
-        // the one closest to the end of the path (center).
-        indexedS.sort { $0.s < $1.s }
+        // Base order of IDs (stable)
+        let baseIDs: [UUID] = generatedItems.map { $0.id }
 
-        // Map to IDs. If generatedItems changed size for any reason, guard indexes.
-        let ids: [UUID] = indexedS.compactMap { pair in
-            guard pair.index >= 0 && pair.index < generatedItems.count else { return nil }
-            return generatedItems[pair.index].id
+        // Compute start index by modular arithmetic so that order matches the previous sort-by-s logic.
+        // We normalize (total - offset) to [0, total), then take ceiling to pick the first index on the path,
+        // and rotate the base array so the last element corresponds to the item at the path end (center).
+        let total = CGFloat(n) * distanceBetweenItems
+        var norm = (total - spiralOffset).truncatingRemainder(dividingBy: total)
+        if norm < 0 { norm += total }
+
+        let start = ((Int(ceil(norm / distanceBetweenItems)) % n) + n) % n
+
+        // Rotate baseIDs so that the sequence starts at `start`
+        let rotated: [UUID]
+        if start == 0 {
+            rotated = baseIDs
+        } else {
+            rotated = Array(baseIDs[start..<n]) + Array(baseIDs[0..<start])
         }
 
         // Assign on main thread to avoid SwiftUI warnings when called from view updates
         DispatchQueue.main.async {
-            self.orderedIDS = ids
+            self.orderedIDS = rotated
         }
     }
 
