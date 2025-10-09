@@ -90,7 +90,13 @@ struct ContentView: View {
     private var config: AnimationConfig { animationPreset.config }
 
     @State private var spiralOffset: CGFloat = 0
-    @State private var dragTranslation: CGFloat = 0
+    @State private var dragTranslation: CGFloat = 0 // kept for compatibility with existing API
+    // Flag to disable swipe/pinch gestures while a DnD operation is active
+    @State private var dragInProgress: Bool = false
+
+    // Track swipe session so movement is immediate and smooth
+    @State private var swipeBegan: Bool = false
+    @State private var swipeStartOffset: CGFloat = 0
 
     var body: some View {
         GeometryReader { geometry in
@@ -103,59 +109,81 @@ struct ContentView: View {
                     distanceToCenter: dynamicDistanceToCenter,
                     circleSize: dynamicCircleSize,
                     centerCircleSize: dynamicCenterCircleSize,
-                    spiralOffset: spiralOffset + dragTranslation,
+                    effectiveSpiralOffset: spiralOffset + dragTranslation, // spiralOffset now moves live
                     distanceBetweenItems: dynamicDistanceBetweenItems,
-                    minCurves: minCurves
+                    minCurves: minCurves,
+                    spiralOffset: $spiralOffset,
+                    onItemDropped: nil
                 )
+                // Listen for drag start/end notifications from SpiralCarousel and update local flag
+                // so parent gestures can respect the drag state.
+                .onReceive(NotificationCenter.default.publisher(for: .spiralDragDidStart)) { _ in
+                    dragInProgress = true
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .spiralDragDidEnd)) { _ in
+                    dragInProgress = false
+                }
             }
-            .gesture(
-                DragGesture()
+            // Don't disable the whole ZStack: disabling cancels child gestures.
+            // Parent gestures are already guarded by `dragInProgress` checks below.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
                     .onChanged { value in
+                        // Ignore swipe gestures while a DnD interaction is active
+                        guard !dragInProgress else { return }
+
+                        // Lock the starting offset once
+                        if !swipeBegan {
+                            swipeBegan = true
+                            swipeStartOffset = spiralOffset
+                        }
+
                         let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
-                        
+
                         if isHorizontal && !disableHorizontalSwipe {
                             let sign: CGFloat = horizontalSwipeDirection == .leftToRight ? 1.0 : -1.0
-                            dragTranslation = sign * value.translation.width * config.sensitivity
+                            // Update the live offset immediately
+                            spiralOffset = swipeStartOffset + sign * value.translation.width * config.sensitivity
+                            dragTranslation = 0
                         } else if !isHorizontal {
                             let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
-                            dragTranslation = sign * value.translation.height * config.sensitivity
+                            spiralOffset = swipeStartOffset + sign * value.translation.height * config.sensitivity
+                            dragTranslation = 0
                         }
                     }
                     .onEnded { value in
+                        // Ignore swipe gesture end while a DnD interaction is active
+                        guard !dragInProgress else { dragTranslation = 0; swipeBegan = false; return }
+
                         let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
-                        let velocity: CGFloat
-                        let translation: CGFloat
-                        
+
                         if isHorizontal && !disableHorizontalSwipe {
                             let sign: CGFloat = horizontalSwipeDirection == .leftToRight ? 1.0 : -1.0
-                            translation = value.translation.width
-                            velocity = value.velocity.width
-                            
-                            let finalOffset = sign * (translation + velocity * 0.1) * config.sensitivity
-                            
+                            // Add a small momentum nudge - translation is already applied live
+                            let velocity: CGFloat = value.velocity.width
+                            let flick = sign * velocity * 0.1 * config.sensitivity
                             withAnimation(config.animation) {
-                                spiralOffset += finalOffset
-                                dragTranslation = 0
+                                spiralOffset += flick
                             }
                         } else if !isHorizontal {
                             let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
-                            translation = value.translation.height
-                            velocity = value.velocity.height
-                            
-                            let finalOffset = sign * (translation + velocity * 0.1) * config.sensitivity
-                            
+                            let velocity: CGFloat = value.velocity.height
+                            let flick = sign * velocity * 0.1 * config.sensitivity
                             withAnimation(config.animation) {
-                                spiralOffset += finalOffset
-                                dragTranslation = 0
+                                spiralOffset += flick
                             }
-                        } else {
-                            dragTranslation = 0
                         }
+
+                        // Reset transient state
+                        dragTranslation = 0
+                        swipeBegan = false
                     }
             )
             .simultaneousGesture(
                 MagnificationGesture()
                     .onEnded { scale in
+                        // Disable pinch while DnD active
+                        guard !dragInProgress else { return }
                         let pinchInThreshold: CGFloat = 0.95
                         let pinchOutThreshold: CGFloat = 1.05
                         

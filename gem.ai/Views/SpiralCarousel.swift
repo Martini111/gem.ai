@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SpiralCarousel: View {
     let numberOfItems: Int
@@ -6,9 +7,10 @@ struct SpiralCarousel: View {
     let distanceToCenter: CGFloat
     let circleSize: CGFloat
     let centerCircleSize: CGFloat
-    let spiralOffset: CGFloat
+    let effectiveSpiralOffset: CGFloat
     let distanceBetweenItems: CGFloat
     let minCurves: Int
+    @Binding var spiralOffset: CGFloat
 
     // Store generated items so their ids are stable across view updates
     @State private var generatedItems: [SpiralItem]
@@ -19,29 +21,46 @@ struct SpiralCarousel: View {
     // Keep last center index to detect when an item reaches the center
     @State private var lastCenterIndex: Int? = nil
 
+    // Dropped item for center circle
+    @State private var centerItem: SpiralItem? = nil
+
+    // --- Drag & drop state ---
+    @State private var draggingItem: SpiralItem? = nil
+    @State private var dragStartPosition: CGPoint = .zero
+    @State private var dragLocation: CGPoint = .zero
+    @State private var showPreview: Bool = false
+
+    // Optional callback to notify parent when an item was dropped into center
+    var onItemDropped: ((SpiralItem) -> Void)? = nil
+
     init(
         numberOfItems: Int,
         distanceBetweenCircles: CGFloat,
         distanceToCenter: CGFloat,
         circleSize: CGFloat,
         centerCircleSize: CGFloat,
-        spiralOffset: CGFloat,
+        effectiveSpiralOffset: CGFloat,
         distanceBetweenItems: CGFloat,
-        minCurves: Int
+        minCurves: Int,
+        spiralOffset: Binding<CGFloat>,
+        onItemDropped: ((SpiralItem) -> Void)? = nil
     ) {
         self.numberOfItems = numberOfItems
         self.distanceBetweenCircles = distanceBetweenCircles
         self.distanceToCenter = distanceToCenter
         self.circleSize = circleSize
         self.centerCircleSize = centerCircleSize
-        self.spiralOffset = spiralOffset
+        self.effectiveSpiralOffset = effectiveSpiralOffset
         self.distanceBetweenItems = distanceBetweenItems
         self.minCurves = minCurves
+        self._spiralOffset = spiralOffset
 
         // Initialize state-backed items with stable UUIDs
         _generatedItems = State(initialValue: generateSpiralItems(count: numberOfItems))
         // Initial ordered IDS will be set onAppear (geometry available) — keep empty for now
         _orderedIDS = State(initialValue: _generatedItems.wrappedValue.map { $0.id })
+
+        self.onItemDropped = onItemDropped
     }
 
     var body: some View {
@@ -72,7 +91,50 @@ struct SpiralCarousel: View {
 
                     let opacity = isStartEdge ? 0.8 : isEndEdge ? 0.0 : 1.0
 
-                    return SpiralItemView(item: item, circleSize: circleSize)
+                    // Pass position and drag callbacks to the item view. The item view will not move;
+                    // we create a separate preview that follows the finger.
+                    return SpiralItemView(
+                        item: item,
+                        circleSize: circleSize,
+                        centerPosition: position,
+                        onDragStart: { start in
+                            // start is the item's center position in this coordinate space
+                            draggingItem = item
+                            dragStartPosition = start
+                            dragLocation = start
+                            // Inform parent that DnD started via notification
+                            NotificationCenter.default.post(name: .spiralDragDidStart, object: nil)
+                            withAnimation(.easeIn(duration: 0.12)) {
+                                showPreview = true
+                            }
+                        },
+                        onDragChanged: { translation in
+                            // Update preview location relative to drag start
+                            dragLocation = CGPoint(x: dragStartPosition.x + translation.width,
+                                                   y: dragStartPosition.y + translation.height)
+                        },
+                        onDragEnd: { translation in
+                            let final = CGPoint(x: dragStartPosition.x + translation.width,
+                                                y: dragStartPosition.y + translation.height)
+                            // Check if final point is inside center circle
+                            let distanceToCenter = hypot(final.x - center.x, final.y - center.y)
+                            if distanceToCenter <= centerCircleSize / 2 {
+                                // Dropped on center
+                                centerItem = item
+                                onItemDropped?(item)
+                            }
+                            // Hide preview and clear state
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                showPreview = false
+                            }
+                            // Delay clearing to allow fade-out animation
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                                draggingItem = nil
+                                // Inform parent that DnD ended via notification
+                                NotificationCenter.default.post(name: .spiralDragDidEnd, object: nil)
+                            }
+                        }
+                    )
                     .position(position)
                     .opacity(opacity)
                     .animation(.easeInOut(duration: 0), value: orderedIDS)
@@ -81,7 +143,7 @@ struct SpiralCarousel: View {
                 // Center circle
                 ZStack {
                     let curIdx = orderedIDS.last
-                    let curItem = generatedItems.first(where: { $0.id == curIdx })
+                    let curItem = centerItem ?? generatedItems.first(where: { $0.id == curIdx })
                     Circle()
                         .fill(curItem?.color ?? Color.blue)
                         .frame(width: centerCircleSize, height: centerCircleSize)
@@ -90,6 +152,37 @@ struct SpiralCarousel: View {
                         .font(.system(size: centerCircleSize / 4))
                 }
                 .position(center)
+                .onDrop(of: [UTType.text], isTargeted: nil) { providers in
+                    guard let provider = providers.first else { return false }
+                    provider.loadObject(ofClass: NSString.self) { object, error in
+                        if let string = object as? String, let uuid = UUID(uuidString: string) {
+                            DispatchQueue.main.async {
+                                if let item = generatedItems.first(where: { $0.id == uuid }) {
+                                    centerItem = item
+                                }
+                            }
+                        }
+                    }
+                    return true
+                }
+
+                // Floating drag preview (renders above everything)
+                if let dragging = draggingItem, showPreview {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 28)
+                            .fill(dragging.color.opacity(0.9))
+                        RoundedRectangle(cornerRadius: 28)
+                            .stroke(Color.white, lineWidth: 4)
+                        Text(dragging.id.uuidString.prefix(4))
+                            .foregroundColor(.white)
+                            .font(.system(size: 20))
+                    }
+                    .frame(width: circleSize * 0.95, height: circleSize * 0.95)
+                    .position(dragLocation)
+                    .shadow(radius: 6)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.12), value: showPreview)
+                }
             }
             // When the view appears, compute initial ordering
             .onAppear {
@@ -164,4 +257,9 @@ struct SpiralCarousel: View {
 
         return CGPoint(x: x, y: y)
     }
+}
+
+extension Notification.Name {
+    static let spiralDragDidStart = Notification.Name("SpiralCarousel.DragDidStart")
+    static let spiralDragDidEnd = Notification.Name("SpiralCarousel.DragDidEnd")
 }
