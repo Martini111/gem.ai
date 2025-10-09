@@ -168,20 +168,11 @@ struct SpiralCarousel: View {
 
                 // Floating drag preview (renders above everything)
                 if let dragging = draggingItem, showPreview {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 28)
-                            .fill(dragging.color.opacity(0.9))
-                        RoundedRectangle(cornerRadius: 28)
-                            .stroke(Color.white, lineWidth: 4)
-                        Text(dragging.id.uuidString.prefix(4))
-                            .foregroundColor(.white)
-                            .font(.system(size: 20))
-                    }
-                    .frame(width: circleSize * 0.95, height: circleSize * 0.95)
-                    .position(dragLocation)
-                    .shadow(radius: 6)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.12), value: showPreview)
+                    SpiralItemPreviewView(item: dragging, size: circleSize * 0.95)
+                        .position(dragLocation)
+                        .shadow(radius: 6)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.12), value: showPreview)
                 }
             }
             // When the view appears, compute initial ordering
