@@ -21,8 +21,8 @@ struct ContentView: View {
     let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
     let disableHorizontalSwipe: Bool = false
     let numberOfItems: Int = 200
-    let distanceBetweenItems: CGFloat = 100
-    let distanceBetweenCircles: CGFloat = 100
+    let distanceBetweenItems: CGFloat = 120
+    let distanceBetweenCircles: CGFloat = 120
     let distanceToCenter: CGFloat = 80
     let circleSize: CGFloat = 90
     let centerCircleSize: CGFloat = 200

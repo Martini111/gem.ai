@@ -62,20 +62,19 @@ struct SpiralCarousel: View {
                 .stroke(Color.black.opacity(0.2), lineWidth: 2)
 
                 // Кружечки на спіралі
-                ForEach(Array(generatedItems.enumerated()), id: \.element.id) { (index, item) in
+                ForEach($generatedItems, id: \.id) { $item in
+                    let item = $item.wrappedValue
+                    let index = generatedItems.firstIndex(where: { $0.id == item.id })!
                     let position = spiralPosition(for: index, center: center)
-                    let isEdge = (orderedIDS.last == item.id)
+                    
+                    let isEndEdge = (orderedIDS.last == item.id)
+                    let isStartEdge = (orderedIDS.first == item.id)
 
-                    ZStack {
-                        Circle()
-                            .fill(item.color)
-                            .frame(width: circleSize, height: circleSize)
-                        Text(item.id.uuidString.prefix(4))
-                            .foregroundColor(.white)
-                            .font(.system(size: 20))
-                    }
+                    let opacity = isStartEdge ? 0.8 : isEndEdge ? 0.0 : 1.0
+
+                    return SpiralItemView(item: item, circleSize: circleSize)
                     .position(position)
-                    .opacity(isEdge ? 0 : 1)
+                    .opacity(opacity)
                     .animation(.easeInOut(duration: 0), value: orderedIDS)
                 }
 
