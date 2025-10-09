@@ -20,7 +20,7 @@ struct ContentView: View {
     let swipeDirection: SwipeDirection = .topToBottom
     let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
     let disableHorizontalSwipe: Bool = false
-    let numberOfItems: Int = 200
+    let numberOfItems: Int = 100
     let distanceBetweenItems: CGFloat = 120
     let distanceBetweenCircles: CGFloat = 120
     let distanceToCenter: CGFloat = 80
@@ -44,8 +44,8 @@ struct ContentView: View {
             switch self {
             case .fast:
                 return AnimationConfig(
-                    sensitivity: 0.55,
-                    response: 0.7,
+                    sensitivity: 0.3,
+                    response: 0.5,
                     dampingFraction: 0.7
                 )
             case .medium:
