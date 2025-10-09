@@ -45,7 +45,7 @@ struct ContentView: View {
             case .fast:
                 return AnimationConfig(
                     sensitivity: 0.55,
-                    response: 0.3,
+                    response: 0.7,
                     dampingFraction: 0.7
                 )
             case .medium:
