@@ -6,7 +6,6 @@ struct SpiralCarousel: View {
     let distanceToCenter: CGFloat
     let circleSize: CGFloat
     let centerCircleSize: CGFloat
-    let effectiveSpiralOffset: CGFloat
     let distanceBetweenItems: CGFloat
     let minCurves: Int
     @Binding var spiralOffset: CGFloat
@@ -26,7 +25,6 @@ struct SpiralCarousel: View {
         distanceToCenter: CGFloat,
         circleSize: CGFloat,
         centerCircleSize: CGFloat,
-        effectiveSpiralOffset: CGFloat,
         distanceBetweenItems: CGFloat,
         minCurves: Int,
         spiralOffset: Binding<CGFloat>
@@ -36,7 +34,6 @@ struct SpiralCarousel: View {
         self.distanceToCenter = distanceToCenter
         self.circleSize = circleSize
         self.centerCircleSize = centerCircleSize
-        self.effectiveSpiralOffset = effectiveSpiralOffset
         self.distanceBetweenItems = distanceBetweenItems
         self.minCurves = minCurves
         self._spiralOffset = spiralOffset

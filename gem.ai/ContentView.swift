@@ -58,7 +58,6 @@ struct ContentView: View {
                     distanceToCenter: dynamicDistanceToCenter,
                     circleSize: dynamicCircleSize,
                     centerCircleSize: dynamicCenterCircleSize,
-                    effectiveSpiralOffset: spiralOffset,
                     distanceBetweenItems: dynamicDistanceBetweenItems,
                     minCurves: minCurves,
                     spiralOffset: $spiralOffset
