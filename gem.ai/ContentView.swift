@@ -20,7 +20,7 @@ struct ContentView: View {
     let swipeDirection: SwipeDirection = .topToBottom
     let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
     let disableHorizontalSwipe: Bool = false
-    let numberOfItems: Int = 20
+    let numberOfItems: Int = 30
     let distanceBetweenItems: CGFloat = 120
     let distanceBetweenCircles: CGFloat = 120
     let distanceToCenter: CGFloat = 80
@@ -39,7 +39,7 @@ struct ContentView: View {
     // Simplified Animation Presets
     enum AnimationPreset {
         case fast, medium, smooth, slow, highSensitivity
-        
+
         var config: AnimationConfig {
             switch self {
             case .fast:
@@ -75,12 +75,12 @@ struct ContentView: View {
             }
         }
     }
-    
+
     struct AnimationConfig {
         let sensitivity: CGFloat      // How much translation affects offset
         let response: Double           // Spring response (lower = faster)
         let dampingFraction: Double    // Spring damping (higher = less bounce)
-        
+
         var animation: Animation {
             .spring(response: response, dampingFraction: dampingFraction)
         }
@@ -90,9 +90,6 @@ struct ContentView: View {
     private var config: AnimationConfig { animationPreset.config }
 
     @State private var spiralOffset: CGFloat = 0
-    @State private var dragTranslation: CGFloat = 0 // kept for compatibility with existing API
-    // Flag to disable swipe/pinch gestures while a DnD operation is active
-    @State private var dragInProgress: Bool = false
 
     // Track swipe session so movement is immediate and smooth
     @State private var swipeBegan: Bool = false
@@ -102,36 +99,23 @@ struct ContentView: View {
         GeometryReader { geometry in
             ZStack {
                 Color("BGColor").ignoresSafeArea()
-                
+
                 SpiralCarousel(
                     numberOfItems: numberOfItems,
                     distanceBetweenCircles: dynamicDistanceBetweenCircles,
                     distanceToCenter: dynamicDistanceToCenter,
                     circleSize: dynamicCircleSize,
                     centerCircleSize: dynamicCenterCircleSize,
-                    effectiveSpiralOffset: spiralOffset + dragTranslation, // spiralOffset now moves live
+                    effectiveSpiralOffset: spiralOffset,
                     distanceBetweenItems: dynamicDistanceBetweenItems,
                     minCurves: minCurves,
-                    spiralOffset: $spiralOffset,
-                    onItemDropped: nil
+                    spiralOffset: $spiralOffset
                 )
-                // Listen for drag start/end notifications from SpiralCarousel and update local flag
-                // so parent gestures can respect the drag state.
-                .onReceive(NotificationCenter.default.publisher(for: .spiralDragDidStart)) { _ in
-                    dragInProgress = true
-                }
-                .onReceive(NotificationCenter.default.publisher(for: .spiralDragDidEnd)) { _ in
-                    dragInProgress = false
-                }
             }
             // Don't disable the whole ZStack: disabling cancels child gestures.
-            // Parent gestures are already guarded by `dragInProgress` checks below.
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        // Ignore swipe gestures while a DnD interaction is active
-                        guard !dragInProgress else { return }
-
                         // Lock the starting offset once
                         if !swipeBegan {
                             swipeBegan = true
@@ -144,17 +128,12 @@ struct ContentView: View {
                             let sign: CGFloat = horizontalSwipeDirection == .leftToRight ? 1.0 : -1.0
                             // Update the live offset immediately
                             spiralOffset = swipeStartOffset + sign * value.translation.width * config.sensitivity
-                            dragTranslation = 0
                         } else if !isHorizontal {
                             let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
                             spiralOffset = swipeStartOffset + sign * value.translation.height * config.sensitivity
-                            dragTranslation = 0
                         }
                     }
                     .onEnded { value in
-                        // Ignore swipe gesture end while a DnD interaction is active
-                        guard !dragInProgress else { dragTranslation = 0; swipeBegan = false; return }
-
                         let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
 
                         if isHorizontal && !disableHorizontalSwipe {
@@ -175,18 +154,15 @@ struct ContentView: View {
                         }
 
                         // Reset transient state
-                        dragTranslation = 0
                         swipeBegan = false
                     }
             )
             .simultaneousGesture(
                 MagnificationGesture()
                     .onEnded { scale in
-                        // Disable pinch while DnD active
-                        guard !dragInProgress else { return }
                         let pinchInThreshold: CGFloat = 0.95
                         let pinchOutThreshold: CGFloat = 1.05
-                        
+
                         if scale < pinchInThreshold {
                             withAnimation(.bouncy.speed(2)) {
                                 minCurves += 2

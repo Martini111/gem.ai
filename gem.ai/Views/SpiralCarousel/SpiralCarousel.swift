@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct SpiralCarousel: View {
     let numberOfItems: Int
@@ -21,22 +20,6 @@ struct SpiralCarousel: View {
     // Keep last center index to detect when an item reaches the center
     @State private var lastCenterIndex: Int? = nil
 
-    // Dropped item for center circle
-    @State private var centerItem: SpiralItem? = nil
-
-    // Popup state: show transient popup when centerItem changes
-    @State private var showCenterPopup: Bool = false
-    @State private var popupMessage: String = ""
-
-    // --- Drag & drop state ---
-    @State private var draggingItem: SpiralItem? = nil
-    @State private var dragStartPosition: CGPoint = .zero
-    @State private var dragLocation: CGPoint = .zero
-    @State private var showPreview: Bool = false
-
-    // Optional callback to notify parent when an item was dropped into center
-    var onItemDropped: ((SpiralItem) -> Void)? = nil
-
     init(
         numberOfItems: Int,
         distanceBetweenCircles: CGFloat,
@@ -46,8 +29,7 @@ struct SpiralCarousel: View {
         effectiveSpiralOffset: CGFloat,
         distanceBetweenItems: CGFloat,
         minCurves: Int,
-        spiralOffset: Binding<CGFloat>,
-        onItemDropped: ((SpiralItem) -> Void)? = nil
+        spiralOffset: Binding<CGFloat>
     ) {
         self.numberOfItems = numberOfItems
         self.distanceBetweenCircles = distanceBetweenCircles
@@ -63,8 +45,6 @@ struct SpiralCarousel: View {
         _generatedItems = State(initialValue: generateSpiralItems(count: numberOfItems))
         // Initial ordered IDS will be set onAppear (geometry available) — keep empty for now
         _orderedIDS = State(initialValue: _generatedItems.wrappedValue.map { $0.id })
-
-        self.onItemDropped = onItemDropped
     }
 
     var body: some View {
@@ -94,23 +74,9 @@ struct SpiralCarousel: View {
 
                     let opacity = isStartEdge ? 0.8 : isEndEdge ? 0.0 : 1.0
 
-                    // Pass position and drag callbacks to the item view. The item view will not move;
-                    // we create a separate preview that follows the finger.
                     SpiralItemView(
                         item: item,
-                        circleSize: circleSize,
-                        centerPosition: position,
-                        center: center,
-                        centerCircleSize: centerCircleSize,
-                        draggingItem: $draggingItem,
-                        dragStartPosition: $dragStartPosition,
-                        dragLocation: $dragLocation,
-                        showPreview: $showPreview,
-                        onItemDropped: { dropped in
-                            // Dropped on center — update centerItem and forward callback
-                            centerItem = dropped
-                            onItemDropped?(dropped)
-                        }
+                        circleSize: circleSize
                     )
                     .position(position)
                     .opacity(opacity)
@@ -119,28 +85,12 @@ struct SpiralCarousel: View {
 
                 // Center circle moved to its own view file
                 SpiralCenterItemView(
-                    centerItem: $centerItem,
                     orderedIDS: orderedIDS,
                     generatedItems: generatedItems,
-                    centerCircleSize: centerCircleSize,
-                    onDropItem: { item in
-                        // keep same behavior: notify parent callback
-                        onItemDropped?(item)
-                    }
+                    centerCircleSize: centerCircleSize
                 )
                 .position(center)
 
-                // Floating drag preview (renders above everything)
-                if let dragging = draggingItem, showPreview {
-                    SpiralItemPreviewView(item: dragging, size: circleSize * 0.95)
-                        .position(dragLocation)
-                        .shadow(radius: 6)
-                        .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.12), value: showPreview)
-                }
-
-                // Use GemDetails view (moved popup UI) so the popup is reusable
-                GemDetails(popupMessage: popupMessage, showCenterPopup: showCenterPopup, centerX: center.x)
             }
             // When the view appears, compute initial ordering
             .onAppear {
@@ -153,31 +103,6 @@ struct SpiralCarousel: View {
                 if lastCenterIndex != newCenter {
                     lastCenterIndex = newCenter
                     updateOrderedIDs(spiralOffset: spiralOffset)
-                }
-            }
-            // Show popup when centerItem changes (observe id to avoid requiring Equatable on SpiralItem)
-            .onChange(of: centerItem?.id) { _, newID in
-                guard let id = newID, let item = generatedItems.first(where: { $0.id == id }) else {
-                    // hide if centerItem became nil
-                    withAnimation {
-                        showCenterPopup = false
-                    }
-                    return
-                }
-
-                // Build message with short id and type
-                let shortID = String(item.id.uuidString.prefix(8))
-                popupMessage = "ID: \(shortID)\nType: \(item.type.rawValue)"
-
-                withAnimation {
-                    showCenterPopup = true
-                }
-
-                // Auto-hide after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                    withAnimation {
-                        showCenterPopup = false
-                    }
                 }
             }
         }
@@ -245,9 +170,4 @@ struct SpiralCarousel: View {
 
         return CGPoint(x: x, y: y)
     }
-}
-
-extension Notification.Name {
-    static let spiralDragDidStart = Notification.Name("SpiralCarousel.DragDidStart")
-    static let spiralDragDidEnd = Notification.Name("SpiralCarousel.DragDidEnd")
 }
