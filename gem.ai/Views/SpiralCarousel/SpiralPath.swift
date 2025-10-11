@@ -1,56 +1,84 @@
 import SwiftUI
 
+/// Archimedean spiral path with adaptive sampling and animatable parameters.
 struct SpiralPath: Shape {
-    let minCurves: Int
-    let distanceToCenter: CGFloat
-    let distanceBetweenCircles: CGFloat
-    let numberOfItems: Int
-    let distanceBetweenItems: CGFloat
+    // Public parameters (vars to support animation)
+    var curves: Int = 10
+    var distanceToCenter: CGFloat
+    var distanceBetweenCircles: CGFloat
+    var numberOfItems: Int
+    var distanceBetweenItems: CGFloat
+
+    /// Draw from the outermost point toward the center when true
+    var reverse: Bool = true
+
+    // Animatable support - animate core CGFloats. For Int curves and item count we use CGFloat proxies.
+    var animatableData: AnimatablePair<
+        AnimatablePair<CGFloat, CGFloat>, // distanceToCenter, distanceBetweenCircles
+        AnimatablePair<CGFloat, CGFloat>  // numberOfItemsProxy, distanceBetweenItems
+    > {
+        get {
+            AnimatablePair(
+                AnimatablePair(distanceToCenter, distanceBetweenCircles),
+                AnimatablePair(CGFloat(numberOfItems), distanceBetweenItems)
+            )
+        }
+        set {
+            distanceToCenter = newValue.first.first
+            distanceBetweenCircles = newValue.first.second
+            numberOfItems = max(1, Int(newValue.second.first.rounded()))
+            distanceBetweenItems = newValue.second.second
+        }
+    }
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let center = CGPoint(x: rect.width / 2, y: rect.height / 2)
+        guard curves > 0 else { return path }
 
-        // Parameters for the Archimedean spiral
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+
+        // Archimedean spiral: r = a + b * theta
         let a = distanceToCenter
-        let theta_total = CGFloat(minCurves) * 2 * .pi
-        let maxRadius = distanceBetweenCircles * CGFloat(minCurves)
-        let b = maxRadius / theta_total
-        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
+        let thetaTotal = CGFloat(curves) * 2 * .pi
+        let maxRadius = distanceBetweenCircles * CGFloat(curves)
+        let b = maxRadius / max(thetaTotal, .leastNonzeroMagnitude)
 
-        // Ensure at least 3 curves are displayed
-        let minTheta = CGFloat(minCurves) * 2 * .pi
-        let minS = (b / 2) * minTheta * minTheta + a * minTheta
+        // Target path length coming from items spacing
+        let totalPathLength = max(0, CGFloat(numberOfItems)) * max(distanceBetweenItems, 0)
+
+        // Ensure at least the full number of curves is drawn
+        let minS = (b / 2) * thetaTotal * thetaTotal + a * thetaTotal
         let drawLength = max(totalPathLength, minS)
 
-        // Create smooth spiral path with many points
-        // Adaptive sampling: pick number of points based on the length we need to draw
-        // This keeps the curve smooth but avoids extremely large arrays on big draw lengths.
-        let targetPointSpacing: CGFloat = 2.0 // desired spacing between points (in points/pixels)
-        let estimatedPoints = max(Int((drawLength / targetPointSpacing).rounded()), 200)
-        let maxPoints = 5000 // upper bound to avoid heavy CPU/GPU work
-        let totalPoints = min(estimatedPoints, maxPoints)
+        // Adaptive sampling - keep smoothness while avoiding huge arrays
+        let targetPointSpacing: CGFloat = 2.0
+        let estimatedPoints = max(Int((drawLength / max(targetPointSpacing, 0.25)).rounded()), 200)
+        let clampedPoints = min(estimatedPoints, 5000)
 
-        for i in 0..<totalPoints {
-            let s = (CGFloat(i) / CGFloat(totalPoints - 1)) * drawLength
-            let reversedS = drawLength - s
+        var points: [CGPoint] = []
+        points.reserveCapacity(clampedPoints)
 
-            // Solve for theta: (b/2) * theta^2 + a * theta - reversedS = 0
-            let discriminant = a * a + 2 * b * reversedS
-            let theta = (-a + sqrt(discriminant)) / b
+        for i in 0..<clampedPoints {
+            // s in [0, drawLength]
+            let t = CGFloat(i) / CGFloat(max(clampedPoints - 1, 1))
+            let s = t * drawLength
+            let sEffective = reverse ? (drawLength - s) : s
 
-            // Calculate angle and radius
+            // Solve (b/2) * theta^2 + a * theta - sEffective = 0
+            let disc = max(0, a * a + 2 * b * sEffective)
+            let theta = (-a + sqrt(disc)) / max(b, 0.0001)
+
+            let r = a + b * theta
             let angle = theta
-            let radius = distanceToCenter + b * theta
 
-            let x = center.x + radius * cos(angle)
-            let y = center.y + radius * sin(angle)
+            let x = center.x + r * cos(angle)
+            let y = center.y + r * sin(angle)
+            points.append(CGPoint(x: x, y: y))
+        }
 
-            if i == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
+        if let first = points.first {
+            path.move(to: first)
+            path.addLines(Array(points.dropFirst())) // convert ArraySlice to Array
         }
 
         return path

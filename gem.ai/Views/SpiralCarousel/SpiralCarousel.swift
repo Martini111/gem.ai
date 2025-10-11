@@ -53,7 +53,6 @@ struct SpiralCarousel: View {
 
             ZStack {
                 SpiralPath(
-                    minCurves: minCurves,
                     distanceToCenter: distanceToCenter,
                     distanceBetweenCircles: distanceBetweenCircles,
                     numberOfItems: numberOfItems,
