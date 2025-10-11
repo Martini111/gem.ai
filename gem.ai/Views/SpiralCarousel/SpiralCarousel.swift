@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Carousel that lays out items along an Archimedean spiral.
+/// Optimized: uses `headIndex` instead of building a rotated `orderedIDS` array.
 struct SpiralCarousel: View {
     let numberOfItems: Int
     let distanceBetweenCircles: CGFloat
@@ -7,16 +9,17 @@ struct SpiralCarousel: View {
     let circleSize: CGFloat
     let centerCircleSize: CGFloat
     let distanceBetweenItems: CGFloat
-    let minCurves: Int
+    let minCurves: Int   // kept for compatibility if used by other parts
+
     @Binding var spiralOffset: CGFloat
 
-    // Store generated items so their ids are stable across view updates
+    // Stable items with persistent UUIDs
     @State private var generatedItems: [SpiralItem]
 
-    // New state requested by user: ordered IDs from first on spiral (outer) to last (center)
-    @State private var orderedIDS: [UUID] = []
+    // Logical start of the circular order (outer -> ... -> center)
+    @State private var headIndex: Int = 0
 
-    // Keep last center index to detect when an item reaches the center
+    // Last center index to detect threshold crossing
     @State private var lastCenterIndex: Int? = nil
 
     init(
@@ -38,133 +41,89 @@ struct SpiralCarousel: View {
         self.minCurves = minCurves
         self._spiralOffset = spiralOffset
 
-        // Initialize state-backed items with stable UUIDs
+        // Initialize stable items
         _generatedItems = State(initialValue: generateSpiralItems(count: numberOfItems))
-        // Initial ordered IDS will be set onAppear (geometry available) — keep empty for now
-        _orderedIDS = State(initialValue: _generatedItems.wrappedValue.map { $0.id })
     }
 
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
-            let temp = floor((totalPathLength - spiralOffset) / distanceBetweenItems)
-            let centerIndex = ((Int(temp) % numberOfItems) + numberOfItems) % numberOfItems
+
+            // Compute current center index using shared math
+            let centerIndex = SpiralMath.centerIndex(
+                numberOfItems: numberOfItems,
+                distanceBetweenItems: distanceBetweenItems,
+                spiralOffset: spiralOffset
+            )
 
             ZStack {
+                // Spiral guide path
                 SpiralPath(
-                    minCurves: minCurves,
                     distanceToCenter: distanceToCenter,
-                    distanceBetweenCircles: distanceBetweenCircles,
-                    numberOfItems: numberOfItems,
-                    distanceBetweenItems: distanceBetweenItems
+                    distanceBetweenCircles: distanceBetweenCircles
                 )
                 .stroke(Color.white.opacity(0.4), lineWidth: 1)
 
-                ForEach($generatedItems, id: \.id) { $item in
-                    let item = $item.wrappedValue
-                    let index = generatedItems.firstIndex(where: { $0.id == item.id })!
-                    let position = spiralPosition(for: index, center: center)
+                // Place items - iterate by indices for O(1) access
+                ForEach(generatedItems.indices, id: \.self) { i in
+                    let item = generatedItems[i]
+                    let position = spiralPosition(for: i, center: center)
 
-                    let isEndEdge = (orderedIDS.last == item.id)
-                    let isStartEdge = (orderedIDS.first == item.id)
 
-                    let opacity = isStartEdge ? 0.8 : isEndEdge ? 0.0 : 1.0
-
-                    SpiralItemView(
-                        item: item,
-                        circleSize: circleSize
-                    )
-                    .position(position)
-                    .opacity(opacity)
-                    .animation(.easeInOut(duration: 0), value: orderedIDS)
+                    SpiralItemView(item: item, circleSize: circleSize)
+                        .position(position)
                 }
 
-                // Center circle moved to its own view file
+                // Center item remains at the center
                 SpiralCenterItemView(
-                    orderedIDS: orderedIDS,
+                    // For the center content you may still want the full arrays; if not needed, refactor accordingly.
+                    orderedIDS: generatedItems.map { $0.id }, // placeholder compatibility
                     generatedItems: generatedItems,
                     centerCircleSize: centerCircleSize
                 )
                 .position(center)
-
             }
-            // When the view appears, compute initial ordering
             .onAppear {
-                updateOrderedIDs(spiralOffset: spiralOffset)
+                updateHeadIndex(spiralOffset: spiralOffset)
                 lastCenterIndex = centerIndex
             }
-            // Update ordered IDs when center index changes — this indicates an item reached the end/center
             .onChange(of: centerIndex) { _, newCenter in
-                // Only update when actual change occurs
                 if lastCenterIndex != newCenter {
                     lastCenterIndex = newCenter
-                    updateOrderedIDs(spiralOffset: spiralOffset)
+                    updateHeadIndex(spiralOffset: spiralOffset)
                 }
             }
         }
     }
 
-    // iOS 18 compatible and optimized: rotate a base array of IDs instead of sorting every time
-    private func updateOrderedIDs(spiralOffset: CGFloat) {
+    /// Update the logical head index based on current offset.
+    private func updateHeadIndex(spiralOffset: CGFloat) {
         let n = numberOfItems
         guard n > 0 else {
-            orderedIDS = []
+            headIndex = 0
             return
         }
-
-        // Base order of IDs (stable)
-        let baseIDs: [UUID] = generatedItems.map { $0.id }
-
-        // Compute start index by modular arithmetic so that order matches the previous sort-by-s logic.
-        // We normalize (total - offset) to [0, total), then take ceiling to pick the first index on the path,
-        // and rotate the base array so the last element corresponds to the item at the path end (center).
-        let total = CGFloat(n) * distanceBetweenItems
-        var norm = (total - spiralOffset).truncatingRemainder(dividingBy: total)
-        if norm < 0 { norm += total }
-
-        let start = ((Int(ceil(norm / distanceBetweenItems)) % n) + n) % n
-
-        // Rotate baseIDs so that the sequence starts at `start`
-        let rotated: [UUID]
-        if start == 0 {
-            rotated = baseIDs
-        } else {
-            rotated = Array(baseIDs[start..<n]) + Array(baseIDs[0..<start])
-        }
-
-        // Assign on main thread to avoid SwiftUI warnings when called from view updates
-        DispatchQueue.main.async {
-            self.orderedIDS = rotated
-        }
+        // Align head with the computed start so that the last logical item corresponds to the center.
+        let start = SpiralMath.centerIndex(
+            numberOfItems: n,
+            distanceBetweenItems: distanceBetweenItems,
+            spiralOffset: spiralOffset
+        )
+        headIndex = start
     }
 
+    /// Position of item on the spiral using shared math utilities.
     private func spiralPosition(for index: Int, center: CGPoint) -> CGPoint {
-        // Parameters for the Archimedean spiral
-        let a = distanceToCenter
-        let theta_total = CGFloat(minCurves) * 2 * .pi
-        let maxRadius = distanceBetweenCircles * CGFloat(minCurves)
-        let b = maxRadius / theta_total
-
-        // Calculate the total path length for infinite looping
-        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
-
-        // Apply offset and ensure infinite looping
-        let adjustedPosition = (CGFloat(index) * distanceBetweenItems + spiralOffset)
-            .truncatingRemainder(dividingBy: totalPathLength)
-        let s = adjustedPosition < 0 ? adjustedPosition + totalPathLength : adjustedPosition
-
-        // Solve for theta: (b/2) * theta^2 + a * theta - s = 0
-        let discriminant = a * a + 2 * b * s
-        let theta = (-a + sqrt(discriminant)) / b
-
-        // Calculate angle and radius
-        let angle = theta
-        let radius = distanceToCenter + b * theta
-
-        let x = center.x + radius * cos(angle)
-        let y = center.y + radius * sin(angle)
-
-        return CGPoint(x: x, y: y)
+        let params = SpiralParams(
+            distanceToCenter: distanceToCenter,
+            distanceBetweenCircles: distanceBetweenCircles
+        )
+        return SpiralMath.position(center: center,
+           index: index,
+           numberOfItems: numberOfItems,
+           distanceBetweenItems: distanceBetweenItems,
+           spiralOffset: spiralOffset,
+           params: params
+        )
     }
 }

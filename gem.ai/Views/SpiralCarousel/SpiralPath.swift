@@ -1,56 +1,71 @@
 import SwiftUI
 
+/// Spiral path that auto-computes visible angular extent and samples evenly by arc length.
 struct SpiralPath: Shape {
-    let minCurves: Int
-    let distanceToCenter: CGFloat
-    let distanceBetweenCircles: CGFloat
-    let numberOfItems: Int
-    let distanceBetweenItems: CGFloat
+    // Core parameters
+    var distanceToCenter: CGFloat
+    var distanceBetweenCircles: CGFloat
+
+    /// Draw from the outermost visible point toward the center when true
+    var reverse: Bool = true
+
+    /// Overscan margin in points to render slightly beyond edges
+    var overscan: CGFloat = 0
+
+    /// Sampling controls
+    var targetPointSpacing: CGFloat = 2.0
+    var minPoints: Int = 200
+    var maxPoints: Int = 5000
+
+    // Animate core CGFloats so changes are smooth
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(distanceToCenter, distanceBetweenCircles) }
+        set {
+            distanceToCenter = newValue.first
+            distanceBetweenCircles = newValue.second
+        }
+    }
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let center = CGPoint(x: rect.width / 2, y: rect.height / 2)
 
-        // Parameters for the Archimedean spiral
-        let a = distanceToCenter
-        let theta_total = CGFloat(minCurves) * 2 * .pi
-        let maxRadius = distanceBetweenCircles * CGFloat(minCurves)
-        let b = maxRadius / theta_total
-        let totalPathLength = CGFloat(numberOfItems) * distanceBetweenItems
+        // Guard against degenerate inputs
+        let params = SpiralParams(distanceToCenter: max(0, distanceToCenter),
+                                  distanceBetweenCircles: max(0, distanceBetweenCircles))
+        let b = SpiralMath.b(params)
+        guard b > .ulpOfOne else { return path }
 
-        // Ensure at least 3 curves are displayed
-        let minTheta = CGFloat(minCurves) * 2 * .pi
-        let minS = (b / 2) * minTheta * minTheta + a * minTheta
-        let drawLength = max(totalPathLength, minS)
+        // Visible angular extent
+        let thetaEnd = SpiralMath.thetaEndVisible(in: rect, params: params, overscan: overscan)
+        guard thetaEnd > 0 else { return path }
 
-        // Create smooth spiral path with many points
-        // Adaptive sampling: pick number of points based on the length we need to draw
-        // This keeps the curve smooth but avoids extremely large arrays on big draw lengths.
-        let targetPointSpacing: CGFloat = 2.0 // desired spacing between points (in points/pixels)
-        let estimatedPoints = max(Int((drawLength / targetPointSpacing).rounded()), 200)
-        let maxPoints = 5000 // upper bound to avoid heavy CPU/GPU work
-        let totalPoints = min(estimatedPoints, maxPoints)
+        // Total visible arc length
+        let drawLength = SpiralMath.arcLength(a: params.distanceToCenter, b: b, theta: thetaEnd)
+
+        // Adaptive sampling
+        let estimated = max(Int((drawLength / max(targetPointSpacing, 0.25)).rounded()), minPoints)
+        let totalPoints = min(estimated, maxPoints)
+
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        var points: [CGPoint] = []
+        points.reserveCapacity(totalPoints)
+
+        let a = params.distanceToCenter
+        let bSafe = max(b, 0.0001)
 
         for i in 0..<totalPoints {
-            let s = (CGFloat(i) / CGFloat(totalPoints - 1)) * drawLength
-            let reversedS = drawLength - s
+            let t = CGFloat(i) / CGFloat(max(totalPoints - 1, 1))
+            let s = t * drawLength
+            let sEffective = reverse ? (drawLength - s) : s
 
-            // Solve for theta: (b/2) * theta^2 + a * theta - reversedS = 0
-            let discriminant = a * a + 2 * b * reversedS
-            let theta = (-a + sqrt(discriminant)) / b
+            let theta = SpiralMath.theta(fromArcLength: sEffective, a: a, b: bSafe)
+            let p = SpiralMath.point(center: center, a: a, b: bSafe, theta: theta)
+            points.append(p)
+        }
 
-            // Calculate angle and radius
-            let angle = theta
-            let radius = distanceToCenter + b * theta
-
-            let x = center.x + radius * cos(angle)
-            let y = center.y + radius * sin(angle)
-
-            if i == 0 {
-                path.move(to: CGPoint(x: x, y: y))
-            } else {
-                path.addLine(to: CGPoint(x: x, y: y))
-            }
+        if let first = points.first {
+            path.move(to: first)
+            path.addLines(Array(points.dropFirst()))
         }
 
         return path
