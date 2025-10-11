@@ -13,14 +13,10 @@ struct ContentView: View {
         case bottomToTop
         case topToBottom
     }
-    enum HorizontalSwipeDirection {
-        case leftToRight
-        case rightToLeft
-    }
+
+    // Removed horizontal swipe enums/flags — only vertical swipe is supported now.
     let swipeDirection: SwipeDirection = .topToBottom
-    let horizontalSwipeDirection: HorizontalSwipeDirection = .leftToRight
-    let disableHorizontalSwipe: Bool = false
-    let numberOfItems: Int = 30
+    let numberOfItems: Int = 120
     let distanceBetweenItems: CGFloat = 120
     let distanceBetweenCircles: CGFloat = 120
     let distanceToCenter: CGFloat = 80
@@ -112,7 +108,6 @@ struct ContentView: View {
                     spiralOffset: $spiralOffset
                 )
             }
-            // Don't disable the whole ZStack: disabling cancels child gestures.
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -122,35 +117,16 @@ struct ContentView: View {
                             swipeStartOffset = spiralOffset
                         }
 
-                        let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
-
-                        if isHorizontal && !disableHorizontalSwipe {
-                            let sign: CGFloat = horizontalSwipeDirection == .leftToRight ? 1.0 : -1.0
-                            // Update the live offset immediately
-                            spiralOffset = swipeStartOffset + sign * value.translation.width * config.sensitivity
-                        } else if !isHorizontal {
-                            let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
-                            spiralOffset = swipeStartOffset + sign * value.translation.height * config.sensitivity
-                        }
+                        // Always treat drag as vertical for offset calculation
+                        let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
+                        spiralOffset = swipeStartOffset + sign * value.translation.height * config.sensitivity
                     }
                     .onEnded { value in
-                        let isHorizontal = abs(value.translation.width) > abs(value.translation.height)
-
-                        if isHorizontal && !disableHorizontalSwipe {
-                            let sign: CGFloat = horizontalSwipeDirection == .leftToRight ? 1.0 : -1.0
-                            // Add a small momentum nudge - translation is already applied live
-                            let velocity: CGFloat = value.velocity.width
-                            let flick = sign * velocity * 0.1 * config.sensitivity
-                            withAnimation(config.animation) {
-                                spiralOffset += flick
-                            }
-                        } else if !isHorizontal {
-                            let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
-                            let velocity: CGFloat = value.velocity.height
-                            let flick = sign * velocity * 0.1 * config.sensitivity
-                            withAnimation(config.animation) {
-                                spiralOffset += flick
-                            }
+                        let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
+                        let velocity: CGFloat = value.velocity.height
+                        let flick = sign * velocity * 0.1 * config.sensitivity
+                        withAnimation(config.animation) {
+                            spiralOffset += flick
                         }
 
                         // Reset transient state
