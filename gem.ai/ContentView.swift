@@ -32,58 +32,14 @@ struct ContentView: View {
     private var dynamicDistanceBetweenCircles: CGFloat { distanceBetweenCircles + CGFloat(pinchLevel) * 10.0 }
     private var dynamicDistanceBetweenItems: CGFloat { distanceBetweenItems + CGFloat(pinchLevel) * 10.0 }
 
-    // Simplified Animation Presets
-    enum AnimationPreset {
-        case fast, medium, smooth, slow, highSensitivity
+    // Animation configuration: configure only these three values
+    private let sensitivity: CGFloat = 0.3       // How much translation affects offset
+    private let response: Double = 0.5           // Spring response (lower = faster)
+    private let dampingFraction: Double = 0.7    // Spring damping (higher = less bounce)
 
-        var config: AnimationConfig {
-            switch self {
-            case .fast:
-                return AnimationConfig(
-                    sensitivity: 0.3,
-                    response: 0.5,
-                    dampingFraction: 0.7
-                )
-            case .medium:
-                return AnimationConfig(
-                    sensitivity: 0.4,
-                    response: 0.4,
-                    dampingFraction: 0.75
-                )
-            case .smooth:
-                return AnimationConfig(
-                    sensitivity: 0.35,
-                    response: 0.5,
-                    dampingFraction: 0.85
-                )
-            case .slow:
-                return AnimationConfig(
-                    sensitivity: 0.25,
-                    response: 0.6,
-                    dampingFraction: 0.9
-                )
-            case .highSensitivity:
-                return AnimationConfig(
-                    sensitivity: 0.7,
-                    response: 0.25,
-                    dampingFraction: 0.65
-                )
-            }
-        }
+    private var animation: Animation {
+        .spring(response: response, dampingFraction: dampingFraction)
     }
-
-    struct AnimationConfig {
-        let sensitivity: CGFloat      // How much translation affects offset
-        let response: Double           // Spring response (lower = faster)
-        let dampingFraction: Double    // Spring damping (higher = less bounce)
-
-        var animation: Animation {
-            .spring(response: response, dampingFraction: dampingFraction)
-        }
-    }
-
-    private let animationPreset: AnimationPreset = .fast
-    private var config: AnimationConfig { animationPreset.config }
 
     @State private var spiralOffset: CGFloat = 0
 
@@ -112,20 +68,20 @@ struct ContentView: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         // Lock the starting offset once
-                        if !swipeBegan {
+                        if (!swipeBegan) {
                             swipeBegan = true
                             swipeStartOffset = spiralOffset
                         }
 
                         // Always treat drag as vertical for offset calculation
                         let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
-                        spiralOffset = swipeStartOffset + sign * value.translation.height * config.sensitivity
+                        spiralOffset = swipeStartOffset + sign * value.translation.height * sensitivity
                     }
                     .onEnded { value in
                         let sign: CGFloat = swipeDirection == .bottomToTop ? -1.0 : 1.0
                         let velocity: CGFloat = value.velocity.height
-                        let flick = sign * velocity * 0.1 * config.sensitivity
-                        withAnimation(config.animation) {
+                        let flick = sign * velocity * 0.1 * sensitivity
+                        withAnimation(animation) {
                             spiralOffset += flick
                         }
 
@@ -140,12 +96,12 @@ struct ContentView: View {
                         let pinchOutThreshold: CGFloat = 1.05
 
                         if scale < pinchInThreshold {
-                            withAnimation(.bouncy.speed(2)) {
+                            withAnimation(.bouncy(duration: 0.2)) {
                                 minCurves += 2
                                 pinchLevel = max(-3, pinchLevel - 1)
                             }
                         } else if scale > pinchOutThreshold {
-                            withAnimation(.bouncy.speed(2)) {
+                            withAnimation(.bouncy(duration: 0.2)) {
                                 minCurves = max(1, minCurves - 2)
                                 pinchLevel = min(3, pinchLevel + 1)
                             }
