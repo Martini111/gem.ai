@@ -86,8 +86,6 @@ struct SpiralCarousel: View {
                 )
                 .position(center)
             }
-            // Smooth animation for spiral offset changes
-            .animation(.interactiveSpring(response: 0.35, dampingFraction: 0.8), value: spiralOffset)
         }
         .onChange(of: numberOfItems) { _, newCount in
             generatedItems = generateSpiralItems(count: newCount)
