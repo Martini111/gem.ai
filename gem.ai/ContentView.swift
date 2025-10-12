@@ -31,7 +31,6 @@ struct ContentView: View {
                 circleSize: spiralConfig.circleSize,
                 centerCircleSize: spiralConfig.centerCircleSize,
                 distanceBetweenItems: spiralConfig.distanceBetweenItems,
-                minCurves: vm.minCurves,
                 spiralOffset: $vm.spiralOffset
             )
         }
