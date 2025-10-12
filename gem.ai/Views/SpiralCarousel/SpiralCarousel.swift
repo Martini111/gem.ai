@@ -16,11 +16,7 @@ struct SpiralCarousel: View {
     // Stable items with persistent UUIDs
     @State private var generatedItems: [SpiralItem]
 
-    // Logical start of the circular order (outer -> ... -> center)
-    @State private var headIndex: Int = 0
-
-    // Last center index to detect threshold crossing
-    @State private var lastCenterIndex: Int? = nil
+    // No persistent headIndex needed — centerIndex is computed from spiralOffset
 
     init(
         numberOfItems: Int,
@@ -48,13 +44,16 @@ struct SpiralCarousel: View {
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-
-            // Compute current center index using shared math
-            let centerIndex = SpiralMath.centerIndex(
+            
+            let tailIndex = SpiralMath.tailIndex(
                 numberOfItems: numberOfItems,
                 distanceBetweenItems: distanceBetweenItems,
                 spiralOffset: spiralOffset
             )
+            
+            let currentItem: SpiralItem? = generatedItems.indices.contains(tailIndex)
+                ? generatedItems[tailIndex]
+                : nil
 
             ZStack {
                 // Spiral guide path
@@ -64,7 +63,7 @@ struct SpiralCarousel: View {
                 )
                 .stroke(Color.white.opacity(0.4), lineWidth: 1)
 
-                // Place items - iterate by indices for O(1) access
+
                 ForEach(generatedItems.indices, id: \.self) { i in
                     let item = generatedItems[i]
                     let position = spiralPosition(for: i, center: center)
@@ -73,44 +72,16 @@ struct SpiralCarousel: View {
                     SpiralItemView(item: item, circleSize: circleSize)
                         .position(position)
                 }
+                
 
-                // Center item remains at the center
                 SpiralCenterItemView(
-                    // For the center content you may still want the full arrays; if not needed, refactor accordingly.
-                    orderedIDS: generatedItems.map { $0.id }, // placeholder compatibility
-                    generatedItems: generatedItems,
+                    currentItem: currentItem,
                     centerCircleSize: centerCircleSize
                 )
                 .position(center)
-            }
-            .onAppear {
-                updateHeadIndex(spiralOffset: spiralOffset)
-                lastCenterIndex = centerIndex
-            }
-            .onChange(of: centerIndex) { _, newCenter in
-                if lastCenterIndex != newCenter {
-                    lastCenterIndex = newCenter
-                    updateHeadIndex(spiralOffset: spiralOffset)
-                }
-            }
-        }
-    }
-
-    /// Update the logical head index based on current offset.
-    private func updateHeadIndex(spiralOffset: CGFloat) {
-        let n = numberOfItems
-        guard n > 0 else {
-            headIndex = 0
-            return
-        }
-        // Align head with the computed start so that the last logical item corresponds to the center.
-        let start = SpiralMath.centerIndex(
-            numberOfItems: n,
-            distanceBetweenItems: distanceBetweenItems,
-            spiralOffset: spiralOffset
-        )
-        headIndex = start
-    }
+             }
+         }
+     }
 
     /// Position of item on the spiral using shared math utilities.
     private func spiralPosition(for index: Int, center: CGPoint) -> CGPoint {

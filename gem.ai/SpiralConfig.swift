@@ -3,7 +3,7 @@ import SwiftUI
 /// Static base configuration for the spiral.
 /// All dynamic values are derived from this config and the pinchLevel.
 struct SpiralConfig {
-    var numberOfItems: Int = 10
+    var numberOfItems: Int = 100
     var distanceBetweenItems: CGFloat = 120
     var distanceBetweenCircles: CGFloat = 120
     var distanceToCenter: CGFloat = 80

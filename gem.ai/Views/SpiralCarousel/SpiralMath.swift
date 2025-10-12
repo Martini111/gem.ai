@@ -88,6 +88,15 @@ enum SpiralMath {
         return posMod(start, n)
     }
 
+    /// Tail (last) index in the circular ordering — the item immediately before the center.
+    /// This is useful when you need the index of the item at the tail end of the logical sequence.
+    @inlinable
+    static func tailIndex(numberOfItems n: Int, distanceBetweenItems: CGFloat, spiralOffset: CGFloat) -> Int {
+        guard n > 0, distanceBetweenItems > 0 else { return 0 }
+        let center = centerIndex(numberOfItems: n, distanceBetweenItems: distanceBetweenItems, spiralOffset: spiralOffset)
+        return posMod(center - 1, n)
+    }
+
     /// Position of an item by index with infinite looping along arc length.
     @inlinable
     static func position(center: CGPoint,
