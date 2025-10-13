@@ -1,22 +1,19 @@
 import SwiftUI
 
-/// ContentView - single finger circular scroll + pinch to adjust spiral density.
-/// Angle deltas are normalized to avoid jumps when crossing the -π/π boundary.
 struct ContentView: View {
     @StateObject private var vm = ContentVM()
 
-    // Gesture-scoped state for the previous angle during a drag
+    // angle tracking - unchanged
     @GestureState private var previousAngleRadians: Double?
+    // pinch anchor stores the last committed magnification to enable thresholded stepping mid-gesture
+    @GestureState private var pinchAnchor: CGFloat = 1
 
-    // Helper moved out of the body
     private func angleRadians(center: CGPoint, point: CGPoint) -> Double {
         Double(atan2(point.y - center.y, point.x - center.x))
     }
 
-    /// Normalize raw angular difference into the smallest signed delta in [-π, π]
     private func normalizedDelta(from prev: Double, to next: Double) -> CGFloat {
         var d = next - prev
-        // Wrap into [-π, π]
         d = remainder(d, 2 * .pi)
         if d > .pi { d -= 2 * .pi }
         if d < -Double.pi { d += 2 * .pi }
@@ -27,11 +24,26 @@ struct ContentView: View {
         GeometryReader { proxy in
             let center = CGPoint(x: proxy.size.width * 0.5, y: proxy.size.height * 0.5)
 
-            // Pinch for spiral density control
+            // - New: live stepping pinch
+            // - value is absolute since gesture start, so we keep a per-gesture anchor and fire steps whenever
+            //   value/anchor crosses a threshold, then reset anchor to current value
             let pinch = MagnificationGesture()
-                .onEnded { vm.pinchEnded(scale: $0) }
+                .updating($pinchAnchor) { value, state, _ in
+                    // value starts at 1.0
+                    let ratio = value / max(state, 0.0001)
 
-            // Single finger circular drag - convert movement to angular deltas around the view center
+                    if ratio <= vm.pinchInThreshold {
+                        vm.pinchStep(direction: .in)
+                        state = value
+                    } else if ratio >= vm.pinchOutThreshold {
+                        vm.pinchStep(direction: .out)
+                        state = value
+                    }
+                }
+                .onEnded { _ in
+                    vm.pinchEndedCleanup()
+                }
+
             let circular = DragGesture(minimumDistance: 0, coordinateSpace: .local)
                 .updating($previousAngleRadians) { value, state, _ in
                     let current = angleRadians(center: center, point: value.location)
@@ -40,12 +52,10 @@ struct ContentView: View {
                         vm.applyAngle(deltaRadians: delta)
                         state = current
                     } else {
-                        // Initialize reference on first update
                         state = angleRadians(center: center, point: value.startLocation)
                     }
                 }
                 .onEnded { value in
-                    // Predictive momentum - also normalized to avoid 2π spikes
                     let last = angleRadians(center: center, point: value.location)
                     let predicted = angleRadians(center: center, point: value.predictedEndLocation)
                     let predictedDelta = normalizedDelta(from: last, to: predicted)
@@ -65,12 +75,12 @@ struct ContentView: View {
                     distanceBetweenItems: tuned.distanceBetweenItems,
                     spiralOffset: $vm.spiralOffset
                 )
-                .drawingGroup() // offscreen rendering for smoother animations
+                .drawingGroup()
             }
-            .ignoresSafeArea()
             .contentShape(Rectangle())
             .gesture(circular.simultaneously(with: pinch))
         }
+        .ignoresSafeArea()
     }
 }
 
