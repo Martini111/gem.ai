@@ -7,9 +7,9 @@ struct SpiralItemView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28)
-                .fill(item.color)
+                .fill(Color("BGColor"))
             RoundedRectangle(cornerRadius: 28)
-                .stroke(Color.white, lineWidth: 4)
+                .stroke(item.color, lineWidth: 4)
         }
         .frame(width: circleSize, height: circleSize)
         .overlay(
