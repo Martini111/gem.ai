@@ -26,7 +26,7 @@ extension SpiralConfig {
     func tuned(pinchLevel: Int, step: CGFloat = 10) -> SpiralConfigTuned {
         SpiralConfigTuned(
             numberOfItems: numberOfItems,
-            distanceBetweenItems: distanceBetweenItems + CGFloat(pinchLevel) * step,
+            distanceBetweenItems: distanceBetweenItems,
             distanceBetweenCircles: distanceBetweenCircles + CGFloat(pinchLevel) * step,
             distanceToCenter: distanceToCenter + CGFloat(pinchLevel) * step,
             circleSize: circleSize + CGFloat(pinchLevel) * step,
