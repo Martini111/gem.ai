@@ -67,6 +67,7 @@ struct ContentView: View {
                 )
                 .drawingGroup() // offscreen rendering for smoother animations
             }
+            .ignoresSafeArea()
             .contentShape(Rectangle())
             .gesture(circular.simultaneously(with: pinch))
         }
