@@ -65,6 +65,34 @@ struct SpiralCarousel: View {
                 spiralPosition(for: i, center: center)
             }
 
+            // Use an explicit array from the indices when iterating to avoid ForEach overload ambiguity
+            // (avoid accidentally matching the `Binding`-based ForEach initializer)
+            let explicitIndices: [Int] = Array(generatedItems.indices)
+
+            // Calculate adjusted arc-length for each item (0..totalS) so we can apply fade near 0/totalS wrap
+            let totalS = CGFloat(max(1, numberOfItems)) * distanceBetweenItems
+
+            // Fade range (how many points of arc-length near the center/start to fade). Tweak as needed.
+            // Cover two items from the center so the closest items are faded to 0.
+            // Using distanceBetweenItems ensures pinch-level tuning adjusts this range.
+            let fadeRange = max(distanceBetweenItems * 2.0, distanceBetweenItems)
+
+            // Precompute adjusted positions along the spiral and corresponding opacities to keep the ViewBuilder
+            // closure free of non-View mutable statements (which can cause "() cannot conform to View").
+            let adjustedS: [CGFloat] = generatedItems.indices.map { i in
+                SpiralMath.posMod(CGFloat(i) * distanceBetweenItems + spiralOffset, totalS)
+            }
+
+            let opacities: [CGFloat] = adjustedS.map { adj in
+                if adj <= fadeRange {
+                    return max(0, adj / fadeRange)
+                } else if adj >= totalS - fadeRange {
+                    return max(0, (totalS - adj) / fadeRange)
+                } else {
+                    return 1
+                }
+            }
+
             ZStack {
                 // Spiral guide path
                 SpiralPath(
@@ -74,10 +102,15 @@ struct SpiralCarousel: View {
                 .stroke(Color.white.opacity(0.4), lineWidth: 1)
                 .drawingGroup() // GPU render optimization
 
-                // Iterate over elements with stable IDs for better diffing
-                ForEach(Array(generatedItems.enumerated()), id: \.element.id) { i, item in
+                // Iterate over integer indices to avoid key-path issues with tuple types in ForEach
+                ForEach(explicitIndices, id: \.self) { (i: Int) in
+                    let item = generatedItems[i]
+                    let opacity = opacities[i]
+
                     SpiralItemView(item: item, circleSize: circleSize)
                         .position(positions[i])
+                        .opacity(Double(opacity))
+                        .animation(.easeInOut(duration: 0.18), value: spiralOffset)
                 }
 
                 SpiralCenterItemView(
