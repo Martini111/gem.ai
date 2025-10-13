@@ -20,6 +20,16 @@ final class ContentVM: ObservableObject {
     let response: Double = 0.5
     let dampingFraction: Double = 0.7
 
+    // Circular gesture tuning
+    // radiansToOffset maps angular movement to spiral offset
+    // Increase for faster looping per small angle, decrease for finer control
+    let radiansToOffset: CGFloat = 260
+    let flickBoost: CGFloat = 1.0 // multiply predicted angular delta for momentum
+
+    // Additional multiplier to control rotation speed independent of radiansToOffset
+    // Set <1.0 for slower response, >1.0 for faster response
+    var rotationSpeed: CGFloat = 0.5
+
     // Pinch settings
     let pinchStep: CGFloat = 10
     let pinchLevelMin: Int = -3
@@ -38,7 +48,21 @@ final class ContentVM: ObservableObject {
         base.tuned(pinchLevel: pinchLevel, step: pinchStep)
     }
 
-    // Gestures
+    // MARK: - New circular gesture API
+
+    // Apply a small incremental angular delta in radians
+    func applyAngle(deltaRadians: CGFloat) {
+        spiralOffset += sign * deltaRadians * radiansToOffset * rotationSpeed
+    }
+
+    // Apply predicted tail for momentum
+    func finishAngleDrag(predictedDeltaRadians: CGFloat) {
+        let flick = sign * predictedDeltaRadians * radiansToOffset * flickBoost * rotationSpeed
+        withAnimation(animation) { spiralOffset += flick }
+    }
+
+    // MARK: - Legacy vertical drag API (kept for reference or fallback)
+
     func applyDrag(start: CGFloat, translation: CGSize) {
         spiralOffset = start + sign * translation.height * sensitivity
     }
@@ -46,8 +70,11 @@ final class ContentVM: ObservableObject {
     func finishDrag(currentTranslation: CGSize, predictedTranslation: CGSize) {
         let vy = (predictedTranslation.height - currentTranslation.height)
         let flick = sign * vy * 0.1 * sensitivity
-        withAnimation(animation) { spiralOffset += flick }
+        spiralOffset += flick
+//        withAnimation(animation) {  }
     }
+
+    // MARK: - Pinch
 
     func pinchEnded(scale: CGFloat) {
         if scale < pinchInThreshold {
