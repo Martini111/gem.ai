@@ -1,65 +1,73 @@
 import SwiftUI
 
+/// ContentView - single finger circular scroll + pinch to adjust spiral density.
+/// Angle deltas are normalized to avoid jumps when crossing the -π/π boundary.
 struct ContentView: View {
     @StateObject private var vm = ContentVM()
-    @GestureState private var dragStartOffset: CGFloat? = nil
-    @GestureState private var rotationStart: Angle? = nil
-    @GestureState private var rotationStartOffset: CGFloat? = nil
 
-    // Helper moved out of the body to avoid declaring functions inside a ViewBuilder closure
-    private func angle(center: CGPoint, point: CGPoint) -> Angle {
-        Angle(radians: Double(atan2(point.y - center.y, point.x - center.x)))
+    // Gesture-scoped state for the previous angle during a drag
+    @GestureState private var previousAngleRadians: Double?
+
+    // Helper moved out of the body
+    private func angleRadians(center: CGPoint, point: CGPoint) -> Double {
+        Double(atan2(point.y - center.y, point.x - center.x))
+    }
+
+    /// Normalize raw angular difference into the smallest signed delta in [-π, π]
+    private func normalizedDelta(from prev: Double, to next: Double) -> CGFloat {
+        var d = next - prev
+        // Wrap into [-π, π]
+        d = remainder(d, 2 * .pi)
+        if d > .pi { d -= 2 * .pi }
+        if d < -Double.pi { d += 2 * .pi }
+        return CGFloat(d)
     }
 
     var body: some View {
-        // Replace linear drag + RotationGesture with a single-finger circular drag around the view center.
-        // We'll compute angle from the center to the touch point and convert angular delta to spiral offset via ContentVM.applyRotation.
-
-        let pinch = MagnificationGesture()
-            .onEnded { vm.pinchEnded(scale: $0) }
-
-        let spiralConfig = vm.tuned
-
         GeometryReader { proxy in
-            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            let center = CGPoint(x: proxy.size.width * 0.5, y: proxy.size.height * 0.5)
 
-            // Single-finger circular drag gesture — compute incremental angle deltas in the updating closure
+            // Pinch for spiral density control
+            let pinch = MagnificationGesture()
+                .onEnded { vm.pinchEnded(scale: $0) }
+
+            // Single finger circular drag - convert movement to angular deltas around the view center
             let circular = DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                .updating($rotationStart) { value, state, _ in
-                    let current = angle(center: center, point: value.location)
+                .updating($previousAngleRadians) { value, state, _ in
+                    let current = angleRadians(center: center, point: value.location)
                     if let prev = state {
-                        // apply incremental delta immediately
-                        let delta = CGFloat(current.radians - prev.radians)
+                        let delta = normalizedDelta(from: prev, to: current)
                         vm.applyAngle(deltaRadians: delta)
                         state = current
                     } else {
-                        // initialize stored angle at gesture start
-                        state = angle(center: center, point: value.startLocation)
+                        // Initialize reference on first update
+                        state = angleRadians(center: center, point: value.startLocation)
                     }
                 }
                 .onEnded { value in
-                    // compute predicted delta for momentum using predicted end location
-                    let last = angle(center: center, point: value.location)
-                    let predicted = angle(center: center, point: value.predictedEndLocation)
-                    let predictedDelta = CGFloat(predicted.radians - last.radians)
+                    // Predictive momentum - also normalized to avoid 2π spikes
+                    let last = angleRadians(center: center, point: value.location)
+                    let predicted = angleRadians(center: center, point: value.predictedEndLocation)
+                    let predictedDelta = normalizedDelta(from: last, to: predicted)
                     vm.finishAngleDrag(predictedDeltaRadians: predictedDelta)
                 }
 
             ZStack {
                 Color("BGColor").ignoresSafeArea()
 
+                let tuned = vm.tuned
                 SpiralCarousel(
-                    numberOfItems: spiralConfig.numberOfItems,
-                    distanceBetweenCircles: spiralConfig.distanceBetweenCircles,
-                    distanceToCenter: spiralConfig.distanceToCenter,
-                    circleSize: spiralConfig.circleSize,
-                    centerCircleSize: spiralConfig.centerCircleSize,
-                    distanceBetweenItems: spiralConfig.distanceBetweenItems,
+                    numberOfItems: tuned.numberOfItems,
+                    distanceBetweenCircles: tuned.distanceBetweenCircles,
+                    distanceToCenter: tuned.distanceToCenter,
+                    circleSize: tuned.circleSize,
+                    centerCircleSize: tuned.centerCircleSize,
+                    distanceBetweenItems: tuned.distanceBetweenItems,
                     spiralOffset: $vm.spiralOffset
                 )
+                .drawingGroup() // offscreen rendering for smoother animations
             }
             .contentShape(Rectangle())
-            // Use circular (single-finger) swipe and pinch together
             .gesture(circular.simultaneously(with: pinch))
         }
     }

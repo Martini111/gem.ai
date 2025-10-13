@@ -16,19 +16,17 @@ final class ContentVM: ObservableObject {
     var swipeDirection: SwipeDirection = .topToBottom
 
     // Animation tuning
-    let sensitivity: CGFloat = 0.3
     let response: Double = 0.5
     let dampingFraction: Double = 0.7
 
     // Circular gesture tuning
     // radiansToOffset maps angular movement to spiral offset
-    // Increase for faster looping per small angle, decrease for finer control
-    let radiansToOffset: CGFloat = 260
-    let flickBoost: CGFloat = 1.0 // multiply predicted angular delta for momentum
+    // Increase for faster looping, decrease for finer control
+    let radiansToOffset: CGFloat = 240
+    let flickBoost: CGFloat = 1.0
 
-    // Additional multiplier to control rotation speed independent of radiansToOffset
-    // Set <1.0 for slower response, >1.0 for faster response
-    var rotationSpeed: CGFloat = 0.5
+    // Additional multiplier to control rotation speed
+    var rotationSpeed: CGFloat = 0.55
 
     // Pinch settings
     let pinchStep: CGFloat = 10
@@ -36,6 +34,9 @@ final class ContentVM: ObservableObject {
     let pinchLevelMax: Int = 3
     let pinchInThreshold: CGFloat = 0.95
     let pinchOutThreshold: CGFloat = 1.05
+
+    // Legacy vertical drag constants left for reference
+    let sensitivity: CGFloat = 0.3
 
     var animation: Animation {
         .spring(response: response, dampingFraction: dampingFraction)
@@ -48,17 +49,20 @@ final class ContentVM: ObservableObject {
         base.tuned(pinchLevel: pinchLevel, step: pinchStep)
     }
 
-    // MARK: - New circular gesture API
+    // MARK: - Circular gesture API
 
-    // Apply a small incremental angular delta in radians
+    /// Apply a small incremental angular delta in radians - already normalized by the caller
     func applyAngle(deltaRadians: CGFloat) {
+        // Scale and accumulate
         spiralOffset += sign * deltaRadians * radiansToOffset * rotationSpeed
     }
 
-    // Apply predicted tail for momentum
+    /// Apply predicted tail for momentum - delta is normalized by the caller
     func finishAngleDrag(predictedDeltaRadians: CGFloat) {
         let flick = sign * predictedDeltaRadians * radiansToOffset * flickBoost * rotationSpeed
-        withAnimation(animation) { spiralOffset += flick }
+        withAnimation(animation) {
+            spiralOffset += flick
+        }
     }
 
     // MARK: - Legacy vertical drag API (kept for reference or fallback)
@@ -71,7 +75,6 @@ final class ContentVM: ObservableObject {
         let vy = (predictedTranslation.height - currentTranslation.height)
         let flick = sign * vy * 0.1 * sensitivity
         spiralOffset += flick
-//        withAnimation(animation) {  }
     }
 
     // MARK: - Pinch
